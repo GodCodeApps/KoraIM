@@ -10,12 +10,14 @@
         android:id="@+id/tv_time"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="#999999"
-        android:textSize="12dp"
+        android:textColor="#B3B3B3"
+        android:textSize="12sp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        tools:text="1000000000000" />
+        tools:text="昨天 晚上8:36" />
 
     <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="match_parent"

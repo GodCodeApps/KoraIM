@@ -110,7 +110,12 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
         val targetAvatarView = if (isReceivedMsg()) leftAvatar else rightAvatar
         
         // 1. 列表复用时，先立刻展示默认头像，防止头像错乱闪烁
-        targetAvatarView?.setImageResource(defaultAvatarRes)
+        targetAvatarView?.let { imageView ->
+            Glide.with(itemView.context)
+                .load(defaultAvatarRes)
+                .transform(com.bumptech.glide.load.resource.bitmap.RoundedCorners(16))
+                .into(imageView)
+        }
 
         // 2. 异步/同步获取用户信息
         IMClient.getUserInfo(account) { userInfo ->
@@ -122,10 +127,14 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                         .load(avatarUrl)
                         .placeholder(defaultAvatarRes)
                         .error(defaultAvatarRes)
+                        .transform(com.bumptech.glide.load.resource.bitmap.RoundedCorners(16))
                         .into(imageView)
                 } else {
                     // 明确没有头像数据，确保展示默认头像
-                    imageView.setImageResource(defaultAvatarRes)
+                    Glide.with(itemView.context)
+                        .load(defaultAvatarRes)
+                        .transform(com.bumptech.glide.load.resource.bitmap.RoundedCorners(16))
+                        .into(imageView)
                 }
             }
         }

@@ -10,9 +10,9 @@
 
     <ImageView
         android:id="@+id/iv_option_icon"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
-        android:padding="8dp"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:padding="16dp"
         android:background="@drawable/shape_more_option_bg" />
 
     <TextView
@@ -21,6 +21,6 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:textSize="12sp"
-        android:textColor="#666666"/>
+        android:textColor="#999999"/>
 
 </LinearLayout>
