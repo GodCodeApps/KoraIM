@@ -9,8 +9,12 @@ import com.google.gson.Gson
 import com.kora.imcore.db.ImAppDatabaseHelper
 import com.kora.imcore.db.Message
 import com.kora.imcore.db.MessageDao
+import com.kora.imcore.db.UserDao
+import com.kora.imcore.db.UserInfo
 import com.kora.imcore.impl.IMMessage
+import com.kora.imcore.provider.IMUserInfoProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
@@ -29,6 +33,12 @@ object IMClient {
     private var receiveListeners = mutableMapOf<String, ((Message) -> Unit)>()
     private lateinit var mContext: Context
     private lateinit var messageDao: MessageDao
+    private lateinit var userDao: UserDao
+    
+    var userInfoProvider: IMUserInfoProvider? = null
+    
+    // Simple memory cache for UserInfo
+    private val userInfoCache = mutableMapOf<String, UserInfo>()
 
     fun sendMessage(msg: IMMessage) {
         serviceProxy.senMessage(Gson().toJson(msg))
@@ -61,7 +71,9 @@ object IMClient {
     fun init(context: Context) {
         mContext = context
         ImSdkImpl.init()
-        messageDao = MessageDao(ImAppDatabaseHelper(mContext))
+        val dbHelper = ImAppDatabaseHelper(mContext)
+        messageDao = MessageDao(dbHelper)
+        userDao = UserDao(dbHelper)
         context.bindService(
             Intent(context, IMService::class.java),
             serviceProxy,
@@ -125,6 +137,55 @@ object IMClient {
 
     fun clear() {
 
-
+    }
+    
+    fun getUserInfo(account: String?, callback: (UserInfo?) -> Unit) {
+        if (account.isNullOrEmpty()) {
+            callback(null)
+            return
+        }
+        
+        // 1. Check memory cache
+        val cachedInfo = userInfoCache[account]
+        if (cachedInfo != null) {
+            callback(cachedInfo)
+            return
+        }
+        
+        GlobalScope.launch(Dispatchers.IO) {
+            // 2. Check local database
+            var dbInfo = userDao.getUserInfo(account)
+            
+            // 3. Fallback to App layer provider if configured
+            if (dbInfo == null && userInfoProvider != null) {
+                // If it's a synchronous provider method
+                dbInfo = userInfoProvider?.getUserInfo(account)
+                if (dbInfo != null) {
+                    userDao.insertOrUpdateUserInfo(dbInfo)
+                }
+            }
+            
+            if (dbInfo != null) {
+                userInfoCache[account] = dbInfo
+                withContext(Dispatchers.Main) {
+                    callback(dbInfo)
+                }
+            } else {
+                // 4. If still null, trigger async fetch from server
+                userInfoProvider?.fetchUserInfoFromServer(account) { fetchedInfo ->
+                    if (fetchedInfo != null) {
+                        userInfoCache[account] = fetchedInfo
+                        GlobalScope.launch(Dispatchers.IO) {
+                            userDao.insertOrUpdateUserInfo(fetchedInfo)
+                        }
+                    }
+                    callback(fetchedInfo)
+                } ?: run {
+                    withContext(Dispatchers.Main) {
+                        callback(null)
+                    }
+                }
+            }
+        }
     }
 }

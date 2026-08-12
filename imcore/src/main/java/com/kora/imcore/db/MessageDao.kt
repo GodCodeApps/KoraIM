@@ -45,9 +45,7 @@ class MessageDao(private val dbHelper: ImAppDatabaseHelper) {
             val idxTime = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_TIME)
             val idxAttachment = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_ATTACHMENT)
             val idxExtra = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_EXTRA)
-            val idxNickname = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_NICKNAME)
             val idxAccount = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_ACCOUNT)
-            val idxAvatar = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_AVATAR)
 
             do {
                 val msg = Message()
@@ -61,9 +59,7 @@ class MessageDao(private val dbHelper: ImAppDatabaseHelper) {
                 msg.time = cursor.getLong(idxTime)
                 msg.attachment = cursor.getString(idxAttachment)
                 msg.extra = cursor.getString(idxExtra)
-                msg.nickname = cursor.getString(idxNickname)
                 msg.account = cursor.getString(idxAccount)
-                msg.avatar = cursor.getString(idxAvatar)
                 list.add(msg)
             } while (cursor.moveToNext())
         }
@@ -85,9 +81,7 @@ class MessageDao(private val dbHelper: ImAppDatabaseHelper) {
         cv.put(ImAppDatabaseHelper.COLUMN_TIME, msg.time)
         cv.put(ImAppDatabaseHelper.COLUMN_ATTACHMENT, msg.attachment)
         cv.put(ImAppDatabaseHelper.COLUMN_EXTRA, msg.extra)
-        cv.put(ImAppDatabaseHelper.COLUMN_NICKNAME, msg.nickname)
         cv.put(ImAppDatabaseHelper.COLUMN_ACCOUNT, msg.account)
-        cv.put(ImAppDatabaseHelper.COLUMN_AVATAR, msg.avatar)
         return cv
     }
 

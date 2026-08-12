@@ -28,9 +28,7 @@ class Message : IMMessage {
     var time: Long = 0
     var attachment: String = ""
     var extra: String = ""
-    var nickname: String = ""
     var account: String = ""
-    var avatar: String = ""
 
     constructor(
         messageId: String = UUID.randomUUID().toString(),

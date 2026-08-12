@@ -10,6 +10,8 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.appcompat.widget.LinearLayoutCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.kora.imcore.IMClient
 import com.kora.imcore.constant.MsgDirection
 import com.kora.imcore.impl.IMMessage
 import com.kora.imui.ImUIKitImpl
@@ -68,6 +70,18 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
             contentContainer?.setBackgroundResource(R.drawable.im_msg_right_bg)
             setGravity(llBody, Gravity.RIGHT)
             setMsgStatus(progress, ivMsgStatus)
+        }
+        
+        // Fetch UserInfo and load avatar
+        val account = mMessage?.getFromAccount()
+        IMClient.getUserInfo(account) { userInfo ->
+            if (userInfo != null) {
+                if (isReceivedMsg()) {
+                    leftAvatar?.let { Glide.with(itemView.context).load(userInfo.avatar).placeholder(R.drawable.ic_launcher_background).into(it) }
+                } else {
+                    rightAvatar?.let { Glide.with(itemView.context).load(userInfo.avatar).placeholder(R.drawable.ic_launcher_background).into(it) }
+                }
+            }
         }
         contentContainer?.setOnClickListener {
             ImUIKitImpl.getSessionListener()?.getItemClickListener()?.invoke(
