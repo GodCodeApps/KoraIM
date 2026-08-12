@@ -1,45 +1,212 @@
 package com.kora.imcore.db
 
-import androidx.room.*
+import android.content.ContentValues
+import android.database.Cursor
+import android.database.sqlite.SQLiteDatabase
 import com.zchd.vsports.im.core.constant.MsgStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 /**
  * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
  * @Author: pym
- * @Date: 2021/12/21:18:07
- * @Description:
+ * @Date: 2026/07/21:18:07
+ * @Description: SQLite implementation of MessageDao
  */
-@Dao
-interface MessageDao {
-    @Transaction
-    @Query("SELECT * FROM Message WHERE sessionId = :sessionId ORDER BY id DESC")
-    fun getMessageBySessionId(sessionId: String): Flow<List<Message>>
+class MessageDao(private val dbHelper: ImAppDatabaseHelper) {
 
+    private val _tableChangeFlow = MutableSharedFlow<Unit>(
+        replay = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
 
-    @Query("SELECT * FROM Message WHERE sessionId = :sessionId ORDER BY id DESC  LIMIT (10) OFFSET (:page)*10")
-    suspend fun getMessageBySessionId(sessionId: String, page: Int): List<Message>
+    init {
+        _tableChangeFlow.tryEmit(Unit)
+    }
 
-    @Transaction
-    @Query("SELECT * FROM Message  WHERE sessionId = :sessionId ORDER BY id DESC LIMIT (1)")
-    fun getLaseMessageBySessionId(sessionId: String): Flow<Message>
+    private fun notifyChange() {
+        _tableChangeFlow.tryEmit(Unit)
+    }
 
-    @Update
-    suspend fun updateMessage(vararg message: Message)
+    private fun parseMessageList(cursor: Cursor): List<Message> {
+        val list = mutableListOf<Message>()
+        if (cursor.moveToFirst()) {
+            val idxId = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_ID)
+            val idxMessageId = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_MESSAGE_ID)
+            val idxSessionType = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_SESSION_TYPE)
+            val idxSessionId = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_SESSION_ID)
+            val idxType = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_TYPE)
+            val idxDirect = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_DIRECT)
+            val idxStatus = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_STATUS)
+            val idxTime = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_TIME)
+            val idxAttachment = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_ATTACHMENT)
+            val idxExtra = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_EXTRA)
+            val idxNickname = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_NICKNAME)
+            val idxAccount = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_ACCOUNT)
+            val idxAvatar = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_AVATAR)
 
-    @Query("UPDATE Message SET status = :status WHERE messageId = :messageId")
-    suspend fun updateMessage(messageId: String, status: Int = MsgStatus.SUCCESS)
+            do {
+                val msg = Message()
+                msg.id = cursor.getLong(idxId)
+                msg.messageId = cursor.getString(idxMessageId)
+                msg.sessionType = cursor.getInt(idxSessionType)
+                msg.sessionId = cursor.getString(idxSessionId)
+                msg.type = cursor.getInt(idxType)
+                msg.direct = cursor.getInt(idxDirect)
+                msg.status = cursor.getInt(idxStatus)
+                msg.time = cursor.getLong(idxTime)
+                msg.attachment = cursor.getString(idxAttachment)
+                msg.extra = cursor.getString(idxExtra)
+                msg.nickname = cursor.getString(idxNickname)
+                msg.account = cursor.getString(idxAccount)
+                msg.avatar = cursor.getString(idxAvatar)
+                list.add(msg)
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        return list
+    }
+    
+    private fun messageToContentValues(msg: Message): ContentValues {
+        val cv = ContentValues()
+        if (msg.id > 0) {
+            cv.put(ImAppDatabaseHelper.COLUMN_ID, msg.id)
+        }
+        cv.put(ImAppDatabaseHelper.COLUMN_MESSAGE_ID, msg.messageId)
+        cv.put(ImAppDatabaseHelper.COLUMN_SESSION_TYPE, msg.sessionType)
+        cv.put(ImAppDatabaseHelper.COLUMN_SESSION_ID, msg.sessionId)
+        cv.put(ImAppDatabaseHelper.COLUMN_TYPE, msg.type)
+        cv.put(ImAppDatabaseHelper.COLUMN_DIRECT, msg.direct)
+        cv.put(ImAppDatabaseHelper.COLUMN_STATUS, msg.status)
+        cv.put(ImAppDatabaseHelper.COLUMN_TIME, msg.time)
+        cv.put(ImAppDatabaseHelper.COLUMN_ATTACHMENT, msg.attachment)
+        cv.put(ImAppDatabaseHelper.COLUMN_EXTRA, msg.extra)
+        cv.put(ImAppDatabaseHelper.COLUMN_NICKNAME, msg.nickname)
+        cv.put(ImAppDatabaseHelper.COLUMN_ACCOUNT, msg.account)
+        cv.put(ImAppDatabaseHelper.COLUMN_AVATAR, msg.avatar)
+        return cv
+    }
 
-    @Transaction
-    @Query("SELECT * FROM Message WHERE messageId = :messageId")
-    fun getMessageByMessageId(messageId: String): Message
+    fun getMessageBySessionId(sessionId: String): Flow<List<Message>> {
+        return _tableChangeFlow.map {
+            val db = dbHelper.readableDatabase
+            val cursor = db.rawQuery(
+                "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE sessionId = ? ORDER BY id DESC",
+                arrayOf(sessionId)
+            )
+            parseMessageList(cursor)
+        }
+    }
 
-    @Insert
-    suspend fun insertMessage(vararg message: Message)
+    suspend fun getMessageBySessionId(sessionId: String, page: Int): List<Message> = withContext(Dispatchers.IO) {
+        val db = dbHelper.readableDatabase
+        val offset = page * 10
+        val cursor = db.rawQuery(
+            "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE sessionId = ? ORDER BY id DESC LIMIT 10 OFFSET ?",
+            arrayOf(sessionId, offset.toString())
+        )
+        parseMessageList(cursor)
+    }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertMessageList(message: List<Message>)
+    fun getLaseMessageBySessionId(sessionId: String): Flow<Message> {
+        return _tableChangeFlow.map {
+            val db = dbHelper.readableDatabase
+            val cursor = db.rawQuery(
+                "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE sessionId = ? ORDER BY id DESC LIMIT 1",
+                arrayOf(sessionId)
+            )
+            val list = parseMessageList(cursor)
+            list.firstOrNull() ?: Message()
+        }
+    }
 
-    @Query("DELETE FROM Message")
-    suspend fun deleteAllMessage()
+    suspend fun updateMessage(vararg message: Message) = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            for (msg in message) {
+                db.update(
+                    ImAppDatabaseHelper.TABLE_MESSAGE,
+                    messageToContentValues(msg),
+                    "id = ?",
+                    arrayOf(msg.id.toString())
+                )
+            }
+            db.setTransactionSuccessful()
+            notifyChange()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    suspend fun updateMessage(messageId: String, status: Int = MsgStatus.SUCCESS) = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        val cv = ContentValues().apply {
+            put(ImAppDatabaseHelper.COLUMN_STATUS, status)
+        }
+        db.update(
+            ImAppDatabaseHelper.TABLE_MESSAGE,
+            cv,
+            "messageId = ?",
+            arrayOf(messageId)
+        )
+        notifyChange()
+    }
+
+    fun getMessageByMessageId(messageId: String): Message {
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery(
+            "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE messageId = ?",
+            arrayOf(messageId)
+        )
+        return parseMessageList(cursor).firstOrNull() ?: Message()
+    }
+
+    suspend fun insertMessage(vararg message: Message) = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            for (msg in message) {
+                db.insert(
+                    ImAppDatabaseHelper.TABLE_MESSAGE,
+                    null,
+                    messageToContentValues(msg)
+                )
+            }
+            db.setTransactionSuccessful()
+            notifyChange()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    suspend fun insertMessageList(messageList: List<Message>) = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            for (msg in messageList) {
+                // Room had REPLACE conflict strategy here
+                db.insertWithOnConflict(
+                    ImAppDatabaseHelper.TABLE_MESSAGE,
+                    null,
+                    messageToContentValues(msg),
+                    SQLiteDatabase.CONFLICT_REPLACE
+                )
+            }
+            db.setTransactionSuccessful()
+            notifyChange()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    suspend fun deleteAllMessage() = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.delete(ImAppDatabaseHelper.TABLE_MESSAGE, null, null)
+        notifyChange()
+    }
 }

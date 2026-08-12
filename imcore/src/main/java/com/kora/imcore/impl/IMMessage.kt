@@ -7,7 +7,7 @@ import java.io.Serializable
 /**
  * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
  * @Author: pym
- * @Date: 2021/12/15:09:39
+ * @Date: 2026/07/15:09:39
  * @Description:
  */
 interface IMMessage : Serializable {

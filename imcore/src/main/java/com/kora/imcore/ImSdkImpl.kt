@@ -6,7 +6,7 @@ import java.util.*
 /**
  * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
  * @Author: pym
- * @Date: 2021/12/24:16:09
+ * @Date: 2026/07/24:16:09
  * @Description:
  */
 object ImSdkImpl {

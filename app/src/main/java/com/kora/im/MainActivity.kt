@@ -13,7 +13,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, P2PMessageFragment()).commit()
         ImSdkImpl.setAccount("test2")
         IMClient.init(this)
         ImUIKitImpl.setSessionEventListener(sessionEventListener {
@@ -39,7 +40,6 @@ class MainActivity : AppCompatActivity() {
                 ).show()
             }
         })
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, P2PMessageFragment()).commit()
+
     }
 }

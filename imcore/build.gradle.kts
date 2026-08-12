@@ -26,10 +26,8 @@ dependencies {
     implementation(libs.material)
     implementation(libs.netty)
     implementation(libs.gson)
-    implementation(libs.roomKtx)
     implementation(libs.livedataKtx)
 
-    annotationProcessor(libs.roomCompiler)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)

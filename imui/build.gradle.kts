@@ -31,6 +31,8 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     api(project(":imcore"))
     implementation(libs.refreshLayout)
+    implementation(libs.glide)
+
 
 //
 //            implementation Dependencies.recyclerview

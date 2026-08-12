@@ -1,5 +1,6 @@
 package com.kora.imui.inputbox;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.text.Editable;
@@ -90,6 +91,7 @@ public class ChatInputView extends LinearLayout {
         setupEmojiPanel();
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private void setupListeners() {
         // 监听文本输入，动态切换“更多”和“发送”按钮
         etMessage.addTextChangedListener(new TextWatcher() {

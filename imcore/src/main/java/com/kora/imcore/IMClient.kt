@@ -6,7 +6,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.asLiveData
 import com.google.gson.Gson
-import com.kora.imcore.db.ImAppDatabase
+import com.kora.imcore.db.ImAppDatabaseHelper
 import com.kora.imcore.db.Message
 import com.kora.imcore.db.MessageDao
 import com.kora.imcore.impl.IMMessage
@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 /**
  * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
  * @Author: pym
- * @Date: 2021/12/22:11:40
+ * @Date: 2026/07/22:11:40
  * @Description:
  */
 object IMClient {
@@ -61,7 +61,7 @@ object IMClient {
     fun init(context: Context) {
         mContext = context
         ImSdkImpl.init()
-        messageDao = ImAppDatabase.getInstance(mContext).messageDao()
+        messageDao = MessageDao(ImAppDatabaseHelper(mContext))
         context.bindService(
             Intent(context, IMService::class.java),
             serviceProxy,

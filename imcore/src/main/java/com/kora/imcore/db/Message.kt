@@ -1,8 +1,6 @@
 package com.kora.imcore.db
 
-import androidx.room.Entity
-import androidx.room.Ignore
-import androidx.room.PrimaryKey
+
 import com.google.gson.Gson
 import com.kora.imcore.ImSdkImpl
 import com.kora.imcore.attachment.MsgAttachment
@@ -16,12 +14,10 @@ import java.util.*
 /**
  * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
  * @Author: pym
- * @Date: 2021/12/21:18:04
+ * @Date: 2026/07/21:18:04
  * @Description:
  */
-@Entity(tableName = "message")
 class Message : IMMessage {
-    @PrimaryKey(autoGenerate = true)
     var id: Long = 0
     var messageId: String = ""
     var sessionType: Int = SessionType.None
@@ -60,7 +56,6 @@ class Message : IMMessage {
         this.extra = extra
     }
 
-    @Ignore
     constructor()
 
     override fun getIMSessionType(): Int {

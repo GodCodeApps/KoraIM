@@ -19,7 +19,7 @@ import com.zchd.vsports.im.core.constant.MsgStatus
 /**
  * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
  * @Author: pym
- * @Date: 2021/12/16:18:42
+ * @Date: 2026/07/16:18:42
  * @Description:
  */
 open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView) {

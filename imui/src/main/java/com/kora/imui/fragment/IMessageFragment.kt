@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.widget.LinearLayoutCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import com.kora.imcore.IMClient
@@ -18,7 +17,7 @@ import com.zchd.vsports.im.ui.InputPanel
 /**
  * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
  * @Author: pym
- * @Date: 2021/12/15:09:35
+ * @Date: 2026/07/15:09:35
  * @Description:im基类
  */
 abstract class IMessageFragment : Fragment(), ModuleProxy {
@@ -41,12 +40,11 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         messageListPanelEx = MessageListPanelEx(this, sessionId, view, true)
-        view.findViewById<LinearLayoutCompat>(R.id.chat_input_view)?.visibility = View.VISIBLE
         InputPanel.Builder()
             .setProxy(this)
             .setSessionId(sessionId)
             .setSessionType(sessionType)
-            .build(view)
+            .build(view, messageListPanelEx = messageListPanelEx!!)
 
     }
 

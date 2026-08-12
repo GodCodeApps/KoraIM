@@ -15,7 +15,8 @@ room = "2.7.0"
 livedataKtx="2.2.0"
 refreshLayout="1.1.0"
 kotlin = "2.2.10"
-ksp="2.2.10-2.0.1"
+glide = "4.16.0"
+
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -28,11 +29,9 @@ androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", ve
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 netty = { group = "io.netty", name = "netty-all", version.ref = "netty" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
-roomCompiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
-roomKtx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 livedataKtx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "livedataKtx" }
-
 refreshLayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "refreshLayout" }
+glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "glide" }
 
 
 [plugins]
