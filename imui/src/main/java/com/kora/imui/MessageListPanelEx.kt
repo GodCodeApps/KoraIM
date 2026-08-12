@@ -57,9 +57,6 @@ class MessageListPanelEx(
 //            mPage++
 //            loadMessageHistory()
 //        }
-        IMClient.queryLaseMessageBySessionId(sessionId)?.observe(context) {
-            Log.e("loadMessageHistory>>>", "$it")
-        }
         /**
          * 监听键盘弹起
          */

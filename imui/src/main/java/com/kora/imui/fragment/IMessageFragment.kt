@@ -61,7 +61,7 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
             .setProxy(this)
             .setSessionId(sessionId)
             .setSessionType(sessionType)
-            .build(view, messageListPanelEx = messageListPanelEx!!)
+            .build(this,view, messageListPanelEx = messageListPanelEx!!)
 
     }
 

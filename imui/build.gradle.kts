@@ -32,6 +32,8 @@ dependencies {
     api(project(":imcore"))
     implementation(libs.refreshLayout)
     implementation(libs.glide)
+    implementation(libs.pictureselector)
+
 
 
 //

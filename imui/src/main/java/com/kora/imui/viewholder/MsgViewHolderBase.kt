@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.kora.imcore.IMClient
 import com.kora.imcore.constant.MsgDirection
+import com.kora.imcore.constant.MsgType
 import com.kora.imcore.impl.IMMessage
 import com.kora.imui.ImUIKitImpl
 import com.kora.imui.R
@@ -73,19 +74,29 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
             rightAvatar?.visibility = View.GONE
             return
         }
+        val isMedia = mMessage?.getMsgType() == MsgType.IMAGE || mMessage?.getMsgType() == MsgType.VIDEO
         if (isReceivedMsg()) {
             leftAvatar?.visibility = View.VISIBLE
             rightAvatar?.visibility = View.GONE
             flMsgStatus?.visibility = View.GONE
-            contentContainer?.setBackgroundResource(R.drawable.im_msg_left_bg)
+            if (isMedia) {
+                contentContainer?.setBackgroundResource(0)
+            } else {
+                contentContainer?.setBackgroundResource(R.drawable.im_msg_left_bg)
+            }
             contentContainer?.backgroundTintList = null // 重置接收方可能存在的 tint
             setGravity(llBody, Gravity.LEFT)
         } else {
             leftAvatar?.visibility = View.GONE
             rightAvatar?.visibility = View.VISIBLE
             flMsgStatus?.visibility = View.VISIBLE
-            contentContainer?.setBackgroundResource(R.drawable.im_msg_right_bg)
-            contentContainer?.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#95EC69")) // 微信绿
+            if (isMedia) {
+                contentContainer?.setBackgroundResource(0)
+                contentContainer?.backgroundTintList = null
+            } else {
+                contentContainer?.setBackgroundResource(R.drawable.im_msg_right_bg)
+                contentContainer?.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#95EC69")) // 微信绿
+            }
             setGravity(llBody, Gravity.RIGHT)
             setMsgStatus(progress, ivMsgStatus)
             ivMsgStatus.setOnClickListener {
@@ -167,6 +178,14 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
     private fun setGravity(viewGroup: ViewGroup, gravity: Int) {
         val params = viewGroup.layoutParams as FrameLayout.LayoutParams
         params.gravity = gravity
+        if (gravity== Gravity.LEFT){
+            params.marginEnd=50
+            params.marginStart=0
+        }else{
+            params.marginEnd=0
+            params.marginStart=50
+
+        }
         viewGroup.layoutParams = params
     }
 }

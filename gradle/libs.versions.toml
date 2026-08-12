@@ -16,6 +16,7 @@ livedataKtx="2.2.0"
 refreshLayout="1.1.0"
 kotlin = "2.2.10"
 glide = "4.16.0"
+pictureselector="v3.11.2"
 
 
 [libraries]
@@ -32,6 +33,7 @@ gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 livedataKtx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "livedataKtx" }
 refreshLayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "refreshLayout" }
 glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "glide" }
+pictureselector = { group = "io.github.lucksiege", name = "pictureselector", version.ref = "pictureselector" }
 
 
 [plugins]

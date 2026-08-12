@@ -44,6 +44,8 @@ class IMService : Service() {
             this.port = port
             GlobalScope.launch {
                 try {
+                    System.setProperty("io.netty.noUnsafe", "true")
+                    io.netty.util.internal.logging.InternalLoggerFactory.setDefaultFactory(io.netty.util.internal.logging.JdkLoggerFactory.INSTANCE)
                     var group = NioEventLoopGroup()
                     bootstrap = Bootstrap()
                         .group(group)

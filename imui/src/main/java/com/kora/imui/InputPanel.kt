@@ -3,15 +3,22 @@ package com.zchd.vsports.im.ui
 import android.text.TextUtils
 import android.view.View
 import android.widget.Toast
+import androidx.fragment.app.Fragment
 import com.kora.imcore.constant.MsgDirection
 import com.kora.imcore.constant.SessionType
 import com.kora.imui.MessageBuilder.createTextMessage
+import com.kora.imui.MessageBuilder.createImageMessage
 import com.kora.imui.MessageListPanelEx
 import com.kora.imui.R
 import com.kora.imui.bean.BaseInputAction
 import com.kora.imui.inputbox.ChatInputView
 import com.kora.imui.inputbox.ChatInputView.OnInputListener
 import com.kora.imui.module.ModuleProxy
+import com.kora.imui.utils.GlideEngine
+import com.luck.picture.lib.basic.PictureSelector
+import com.luck.picture.lib.config.SelectMimeType
+import com.luck.picture.lib.entity.LocalMedia
+import com.luck.picture.lib.interfaces.OnResultCallbackListener
 
 
 /**
@@ -20,6 +27,7 @@ import com.kora.imui.module.ModuleProxy
  * @Description:聊天底部输入区域控制
  */
 class InputPanel(
+    var fragment: Fragment,
     var proxy: ModuleProxy?,
     var sessionId: String,
     var sessionType: Int,
@@ -59,9 +67,9 @@ class InputPanel(
             return this
         }
 
-        fun build(rootView: View, messageListPanelEx: MessageListPanelEx): InputPanel {
+        fun build(fragment: Fragment, rootView: View, messageListPanelEx: MessageListPanelEx): InputPanel {
             return InputPanel(
-                mProxy, mSessionId, mSessionType, mActions, rootView, messageListPanelEx
+                fragment,mProxy, mSessionId, mSessionType, mActions, rootView, messageListPanelEx
             )
         }
     }
@@ -109,6 +117,34 @@ class InputPanel(
             }
 
             override fun onMoreOptionClick(optionName: String?) {
+                if (optionName.equals("相册")) {
+                    PictureSelector.create(proxy?.getAppActivity())
+                        .openGallery(SelectMimeType.ofImage())
+                        .setImageEngine(GlideEngine.createGlideEngine())
+                        .setMaxSelectNum(9)
+                        .forResult(object : OnResultCallbackListener<LocalMedia?> {
+                            override fun onResult(result: ArrayList<LocalMedia?>) {
+                                for (media in result) {
+                                    if (media == null) continue
+                                    val path = media.realPath ?: media.availablePath ?: media.path
+                                    val msg = createImageMessage(
+                                        sessionId = sessionId,
+                                        sessionType = sessionType,
+                                        localPath = path,
+                                        mWidth = media.width,
+                                        mHeight = media.height
+                                    )
+                                    proxy?.sendMessage(msg)
+                                }
+                            }
+
+                            override fun onCancel() {
+                            }
+                        })
+                    return
+                }
+
+
                 Toast.makeText(proxy?.getAppActivity(), optionName + "按钮点击", Toast.LENGTH_SHORT)
                     .show()
             }

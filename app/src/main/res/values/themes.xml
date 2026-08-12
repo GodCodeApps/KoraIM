@@ -6,4 +6,11 @@
     </style>
 
     <style name="Theme.KoraIM" parent="Base.Theme.KoraIM" />
+
+    <style name="Theme.KoraIM.Translucent" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowDisablePreview">true</item>
+    </style>
 </resources>

@@ -36,7 +36,7 @@ const server = net.createServer((socket) => {
                 direct: 1,                           // 1 = IN (Received msg on Android)
                 status: 1,                           // 1 = SUCCESS
                 time: Date.now(),
-                attachment: JSON.stringify({ content: `[服务端收到]: ${text}` }),
+                attachment: receivedMsg.attachment,  // 原样返回内容！不再篡改
                 extra: ""
             };
 

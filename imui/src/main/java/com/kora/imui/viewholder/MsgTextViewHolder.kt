@@ -5,6 +5,7 @@ import androidx.appcompat.widget.AppCompatTextView
 import com.kora.imcore.impl.IMMessage
 import com.kora.imui.R
 import com.kora.imui.attachment.TextAttachment
+import com.kora.imui.inputbox.EmojiDisplayUtils
 
 /**
  * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
@@ -20,6 +21,6 @@ class MsgTextViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
 
     override fun bindViewHolder(view: View, message: IMMessage) {
         val textView = view.findViewById<AppCompatTextView>(R.id.tv_content)
-        textView.text = attachment.content
+        EmojiDisplayUtils.display(view.context,textView,attachment.content)
     }
 }

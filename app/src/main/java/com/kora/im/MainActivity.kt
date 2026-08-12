@@ -15,6 +15,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, P2PMessageFragment()).commit()
+        ImSdkImpl.init()
         ImSdkImpl.setAccount("test2")
         // Initialize IM client with local node.js test server config
         IMClient.init(this, "192.168.1.5", 8090)
