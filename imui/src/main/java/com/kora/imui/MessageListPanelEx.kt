@@ -94,24 +94,12 @@ class MessageListPanelEx(
     }
 
     private fun loadMessageHistory() {
-        IMClient.queryMessageListByPageSize(sessionId, mPage)
-            .observe(context) {
+        IMClient.queryAllMessageListBySessionId( sessionId)?.observe(context) {
+                Log.e("loadMessageHistory", it.toString())
+                mMessageAdapter?.clear()
                 mMessageAdapter?.addList(it)
-//                refreshLayout?.isRefreshing = false
-                val position = mLinearLayoutManager?.findLastCompletelyVisibleItemPosition() ?: 0
-//                if (recyclerVew?.isAttachedToWindow == true) {
-//                    val scroller = createSmoothScroller()
-//                    scroller.targetPosition = position + 1
-//                    mLinearLayoutManager?.startSmoothScroll(scroller)
-//                }
+                scrollToBottom()
             }
-//        IMClient.queryAllMessageListBySessionId(context.requireContext(), sessionId)
-//            .observe(context) {
-//                Log.e("loadMessageHistory", it.toString())
-//                mMessageAdapter?.clear()
-//                mMessageAdapter?.addList(it)
-//                scrollToBottom()
-//            }
 
     }
 
@@ -121,10 +109,10 @@ class MessageListPanelEx(
     }
 
     private fun scrollToBottom() {
-//        if (recyclerVew?.isAttachedToWindow == true) {
-//            val scroller = createSmoothScroller()
-//            scroller.targetPosition = 0
-//            mLinearLayoutManager?.startSmoothScroll(scroller)
-//        }
+        if (recyclerVew?.isAttachedToWindow == true) {
+            val scroller = createSmoothScroller()
+            scroller.targetPosition = 0
+            mLinearLayoutManager?.startSmoothScroll(scroller)
+        }
     }
 }
