@@ -32,6 +32,7 @@ public class ChatInputView extends LinearLayout {
 
     private ImageView ivVoice;
     private EditText etMessage;
+    private TextView btnVoiceRecord;
     private ImageView ivEmoji;
     private ImageView ivMore;
     private TextView btnSend;
@@ -43,15 +44,22 @@ public class ChatInputView extends LinearLayout {
     private RecyclerView rvMoreOptions;
     private RecyclerView rvEmoji;
 
-    // 定义事件回调接口
+    private enum InputMode {
+        TEXT, VOICE, EMOJI, MORE, NONE
+    }
+    
+    private InputMode currentMode = InputMode.NONE;
+
     public interface OnInputListener {
         void onSendMessage(String message);
-
         void onVoiceClick();
-
         void onMoreOptionClick(String optionName);
-
         void onEmojiClick(String emojiTag);
+        
+        // Voice record callbacks
+        void onVoiceRecordStart();
+        void onVoiceRecordEnd();
+        void onVoiceRecordCancel();
     }
 
     public void setOnInputListener(OnInputListener listener) {
@@ -69,13 +77,12 @@ public class ChatInputView extends LinearLayout {
     }
 
     private void init(Context context) {
-        // 加载布局
         LayoutInflater.from(context).inflate(R.layout.view_chat_input, this, true);
         setOrientation(VERTICAL);
 
-        // 初始化视图
         ivVoice = findViewById(R.id.iv_voice);
         etMessage = findViewById(R.id.et_message);
+        btnVoiceRecord = findViewById(R.id.btn_voice_record);
         ivEmoji = findViewById(R.id.iv_emoji);
         ivMore = findViewById(R.id.iv_more);
         btnSend = findViewById(R.id.btn_send);
@@ -83,9 +90,8 @@ public class ChatInputView extends LinearLayout {
         panelEmoji = findViewById(R.id.panel_emoji);
         rvMoreOptions = findViewById(R.id.rv_more_options);
         rvEmoji = findViewById(R.id.rv_emoji);
-        // 设置监听器
+
         setupListeners();
-        // 监听键盘高度
         setupKeyboardListener();
         setupMoreOptionsPanel();
         setupEmojiPanel();
@@ -93,56 +99,26 @@ public class ChatInputView extends LinearLayout {
 
     @SuppressLint("ClickableViewAccessibility")
     private void setupListeners() {
-        // 监听文本输入，动态切换“更多”和“发送”按钮
         etMessage.addTextChangedListener(new TextWatcher() {
             @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-            }
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (s.length() > 0) {
-                    ivMore.setVisibility(GONE);
-                    btnSend.setVisibility(VISIBLE);
-                } else {
-                    ivMore.setVisibility(VISIBLE);
-                    btnSend.setVisibility(GONE);
-                }
+                updateSendButtonState();
             }
 
             @Override
-            public void afterTextChanged(Editable s) {
-            }
+            public void afterTextChanged(Editable s) {}
         });
 
-        // 点击输入框时，隐藏面板并显示键盘
-//        etMessage.setOnClickListener(v -> {
-//            if (isPanelVisible()) {
-//                hideAllPanels();
-//                showKeyboard();
-//            }
-//        });
         etMessage.setOnTouchListener((v, event) -> {
-            // 我们只关心手指抬起的动作，这代表一次点击的完成
             if (event.getAction() == MotionEvent.ACTION_UP) {
-                // 情况一：面板是可见的，我们需要切换到键盘
-                if (isPanelVisible()) {
-//                    isKeyboardRequested = true;
-                    // 先隐藏面板
-                    hideAllPanels();
-                    // 延迟显示键盘以保证平滑过渡
-                    postDelayed(this::showKeyboard, 100);
-                }
-                // 情况二：面板是不可见的，就是一次普通的点击，直接显示键盘
-                else {
-                    showKeyboard();
-                }
+                switchMode(InputMode.TEXT);
             }
-            // 返回 false 让系统继续处理 EditText 的默认触摸行为（例如显示光标）
             return false;
         });
 
-        // 发送按钮
         btnSend.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onSendMessage(etMessage.getText().toString());
@@ -150,18 +126,150 @@ public class ChatInputView extends LinearLayout {
             }
         });
 
-        // 语音按钮
         ivVoice.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onVoiceClick();
+            if (currentMode == InputMode.VOICE) {
+                switchMode(InputMode.TEXT);
+            } else {
+                switchMode(InputMode.VOICE);
             }
         });
 
-        // “更多”按钮
-        ivMore.setOnClickListener(v -> togglePanel(panelMore));
+        ivMore.setOnClickListener(v -> {
+            if (currentMode == InputMode.MORE) {
+                switchMode(InputMode.TEXT);
+            } else {
+                switchMode(InputMode.MORE);
+            }
+        });
 
-        // 表情按钮
-        ivEmoji.setOnClickListener(v -> togglePanel(panelEmoji));
+        ivEmoji.setOnClickListener(v -> {
+            if (currentMode == InputMode.EMOJI) {
+                switchMode(InputMode.TEXT);
+            } else {
+                switchMode(InputMode.EMOJI);
+            }
+        });
+        
+        setupVoiceRecordButton();
+    }
+    
+    @SuppressLint("ClickableViewAccessibility")
+    private void setupVoiceRecordButton() {
+        btnVoiceRecord.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    btnVoiceRecord.setText("松开 结束");
+                    btnVoiceRecord.setPressed(true);
+                    if (listener != null) listener.onVoiceRecordStart();
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    // Simple cancel detection (e.g. swipe up)
+                    if (event.getY() < -50) {
+                        btnVoiceRecord.setText("松开 取消");
+                    } else {
+                        btnVoiceRecord.setText("松开 结束");
+                    }
+                    break;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    btnVoiceRecord.setPressed(false);
+                    btnVoiceRecord.setText("按住 说话");
+                    if (listener != null) {
+                        if (event.getY() < -50) {
+                            listener.onVoiceRecordCancel();
+                        } else {
+                            listener.onVoiceRecordEnd();
+                        }
+                    }
+                    break;
+            }
+            return true;
+        });
+    }
+
+    private void updateSendButtonState() {
+        if (etMessage.getText().length() > 0 && currentMode != InputMode.VOICE) {
+            ivMore.setVisibility(GONE);
+            btnSend.setVisibility(VISIBLE);
+        } else {
+            ivMore.setVisibility(VISIBLE);
+            btnSend.setVisibility(GONE);
+        }
+    }
+
+    private void switchMode(InputMode newMode) {
+        if (currentMode == newMode) return;
+        
+        InputMode oldMode = currentMode;
+        currentMode = newMode;
+        
+        // Reset icons
+        ivVoice.setImageResource(R.drawable.ic_voice);
+        ivEmoji.setImageResource(R.drawable.ic_emoji);
+        
+        switch (newMode) {
+            case TEXT:
+                btnVoiceRecord.setVisibility(GONE);
+                etMessage.setVisibility(VISIBLE);
+                hideAllPanels();
+                showKeyboard();
+                updateSendButtonState();
+                break;
+                
+            case VOICE:
+                ivVoice.setImageResource(R.drawable.ic_keyboard); // Replace with keyboard icon
+                etMessage.setVisibility(GONE);
+                btnVoiceRecord.setVisibility(VISIBLE);
+                hideKeyboard();
+                hideAllPanels();
+                ivMore.setVisibility(VISIBLE);
+                btnSend.setVisibility(GONE);
+                break;
+                
+            case EMOJI:
+                ivEmoji.setImageResource(R.drawable.ic_keyboard); // Replace with keyboard icon
+                btnVoiceRecord.setVisibility(GONE);
+                etMessage.setVisibility(VISIBLE);
+                updateSendButtonState();
+                
+                if (oldMode == InputMode.TEXT) {
+                    hideKeyboard();
+                    postDelayed(() -> showPanel(panelEmoji), 100);
+                } else {
+                    hideKeyboard();
+                    hideAllPanels();
+                    showPanel(panelEmoji);
+                }
+                break;
+                
+            case MORE:
+                btnVoiceRecord.setVisibility(GONE);
+                etMessage.setVisibility(VISIBLE);
+                updateSendButtonState();
+                
+                if (oldMode == InputMode.TEXT) {
+                    hideKeyboard();
+                    postDelayed(() -> showPanel(panelMore), 100);
+                } else {
+                    hideKeyboard();
+                    hideAllPanels();
+                    showPanel(panelMore);
+                }
+                break;
+                
+            case NONE:
+                hideKeyboard();
+                hideAllPanels();
+                break;
+        }
+    }
+    
+    private void showPanel(View panel) {
+        if (keyboardHeight > 0) {
+            panel.getLayoutParams().height = keyboardHeight;
+            panel.requestLayout();
+        }
+        panel.setVisibility(VISIBLE);
     }
 
     private void setupKeyboardListener() {
@@ -173,15 +281,15 @@ public class ChatInputView extends LinearLayout {
                 if (currentKeyboardHeight > 0) {
                     keyboardHeight = currentKeyboardHeight;
                 }
-                // 键盘弹出时，自动隐藏所有面板
-                if (isPanelVisible()) {
+                if (currentMode == InputMode.EMOJI || currentMode == InputMode.MORE || currentMode == InputMode.NONE) {
+                    currentMode = InputMode.TEXT;
+                    ivVoice.setImageResource(R.drawable.ic_voice);
+                    ivEmoji.setImageResource(R.drawable.ic_emoji);
                     hideAllPanels();
                 }
             } else {
-                if (etMessage.isFocused()) {
-                    // 如果焦点还在输入框，说明是代码隐藏的键盘，此时面板应该弹出
-                } else {
-                    hideAllPanels();
+                if (currentMode == InputMode.TEXT && !etMessage.isFocused()) {
+                    currentMode = InputMode.NONE;
                 }
             }
             return insets;
@@ -189,8 +297,7 @@ public class ChatInputView extends LinearLayout {
     }
 
     private void setupMoreOptionsPanel() {
-        rvMoreOptions.setLayoutManager(new GridLayoutManager(getContext(), 4)); // 4列
-
+        rvMoreOptions.setLayoutManager(new GridLayoutManager(getContext(), 4));
         List<MoreOptionItem> options = new ArrayList<>();
         options.add(new MoreOptionItem("相册", R.drawable.ic_more_album));
         options.add(new MoreOptionItem("拍照", R.drawable.ic_more_camera));
@@ -200,81 +307,33 @@ public class ChatInputView extends LinearLayout {
 
         MoreOptionsAdapter adapter = new MoreOptionsAdapter(getContext(), options);
         adapter.setOnItemClickListener(item -> {
-            if (listener != null) {
-                // 将点击事件传递给Activity
-                listener.onMoreOptionClick(item.getName());
-            }
+            if (listener != null) listener.onMoreOptionClick(item.getName());
         });
-
         rvMoreOptions.setAdapter(adapter);
     }
 
     private void setupEmojiPanel() {
-        // 初始化并解析表情数据
         EmojiManager.getInstance().init(getContext());
         List<EmojiItem> emojiList = EmojiManager.getInstance().getEmojiList();
 
-        // 设置 RecyclerView
-        rvEmoji.setLayoutManager(new GridLayoutManager(getContext(), 8)); // 8列
+        rvEmoji.setLayoutManager(new GridLayoutManager(getContext(), 8));
         EmojiAdapter adapter = new EmojiAdapter(getContext(), emojiList);
         adapter.setOnEmojiClickListener(emojiTag -> {
-            if (listener != null) {
-                // 将点击事件传递给 Activity
-                listener.onEmojiClick(emojiTag);
-            }
+            if (listener != null) listener.onEmojiClick(emojiTag);
         });
         rvEmoji.setAdapter(adapter);
     }
 
-
     public void insertText(String text) {
         int start = Math.max(etMessage.getSelectionStart(), 0);
         int end = Math.max(etMessage.getSelectionEnd(), 0);
-        etMessage.getText().replace(Math.min(start, end), Math.max(start, end),
-                text, 0, text.length());
-
-        EmojiDisplayUtils.display(getContext(),etMessage,etMessage.getText());
-    }
-
-    private void togglePanel(View panel) {
-        if (panel.getVisibility() == VISIBLE) {
-            // 如果面板可见，则隐藏它并显示键盘
-            hideAllPanels();
-            showKeyboard();
-            etMessage.requestFocus();
-
-        } else {
-            // 如果面板不可见
-            hideKeyboard();
-            // 先隐藏其他面板
-            hideAllPanels(panel); // 隐藏除当前面板外的所有面板
-
-            // 延迟显示，等待键盘完全收起
-            postDelayed(() -> {
-
-                // 设置面板高度为键盘高度
-                if (keyboardHeight > 0) {
-                    panel.getLayoutParams().height = keyboardHeight;
-                    panel.requestLayout();
-                }
-                panel.setVisibility(VISIBLE);
-                panel.requestFocus();
-
-            }, 200);
-        }
+        etMessage.getText().replace(Math.min(start, end), Math.max(start, end), text, 0, text.length());
+        EmojiDisplayUtils.display(getContext(), etMessage, etMessage.getText());
     }
 
     public void hideAllPanels() {
-        hideAllPanels(null);
-    }
-
-    private void hideAllPanels(View exceptPanel) {
-        if (exceptPanel != panelMore) panelMore.setVisibility(GONE);
-        if (exceptPanel != panelEmoji) panelEmoji.setVisibility(GONE);
-    }
-
-    private boolean isPanelVisible() {
-        return panelMore.getVisibility() == VISIBLE || panelEmoji.getVisibility() == VISIBLE;
+        panelMore.setVisibility(GONE);
+        panelEmoji.setVisibility(GONE);
     }
 
     private void hideKeyboard() {
@@ -290,10 +349,9 @@ public class ChatInputView extends LinearLayout {
         imm.showSoftInput(etMessage, InputMethodManager.SHOW_IMPLICIT);
     }
 
-
     public boolean onInterceptBackPressed() {
-        if (isPanelVisible()) {
-            hideAllPanels();
+        if (currentMode != InputMode.NONE && currentMode != InputMode.TEXT) {
+            switchMode(InputMode.NONE);
             return true;
         }
         return false;

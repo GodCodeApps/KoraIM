@@ -2,7 +2,51 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#EDEDED"
     android:orientation="vertical">
+
+    <!-- 顶部导航栏 -->
+    <FrameLayout
+        android:id="@+id/fl_title_bar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="#EDEDED">
+
+        <ImageView
+            android:id="@+id/iv_back"
+            android:layout_width="56dp"
+            android:layout_height="match_parent"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_back"
+            android:contentDescription="返回"
+            android:background="?attr/selectableItemBackgroundBorderless" />
+
+        <TextView
+            android:id="@+id/tv_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="聊天"
+            android:textColor="#1A1A1A"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+            
+        <ImageView
+            android:id="@+id/iv_more_info"
+            android:layout_width="56dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_more"
+            android:contentDescription="更多"
+            android:background="?attr/selectableItemBackgroundBorderless" />
+    </FrameLayout>
+
+    <!-- 分割线 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="#D0D0D0" />
 
     <!-- 消息列表 -->
     <androidx.recyclerview.widget.RecyclerView

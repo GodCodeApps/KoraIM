@@ -116,6 +116,18 @@ class InputPanel(
             override fun onEmojiClick(emojiTag: String?) {
                 chatInputView.insertText(emojiTag)
             }
+
+            override fun onVoiceRecordStart() {
+                // TODO: 启动录音UI并开始录音
+            }
+
+            override fun onVoiceRecordEnd() {
+                // TODO: 结束录音并发送语音消息
+            }
+
+            override fun onVoiceRecordCancel() {
+                // TODO: 取消录音并隐藏录音UI
+            }
         })
 
     }

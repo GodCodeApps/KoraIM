@@ -78,7 +78,9 @@ class MsgListAdapter : RecyclerView.Adapter<MsgViewHolderBase>() {
         holder: MsgViewHolderBase,
         position: Int
     ) {
-        holder.onBindViewHolder(mMsgList[position])
+        // 因为按 reverseLayout = true 的习惯，index 0 是最新消息，所以时间上的上一条(更老的消息)在 index + 1
+        val prevMessage = if (position + 1 < mMsgList.size) mMsgList[position + 1] else null
+        holder.onBindViewHolder(mMsgList[position], prevMessage)
     }
 
     override fun getItemCount(): Int {
