@@ -7,8 +7,7 @@ Android组件仓库项目
 #### imCore - im核心（websocket层,db层）
 
 ## 初始化启动服务
-
-        IMClient.init(this)
+    IMClient.init(context: Context, host: String, port: Int)
 
 ## 设置当前用户id
 

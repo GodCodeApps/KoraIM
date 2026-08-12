@@ -16,7 +16,8 @@ class MainActivity : AppCompatActivity() {
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, P2PMessageFragment()).commit()
         ImSdkImpl.setAccount("test2")
-        IMClient.init(this)
+        // Initialize IM client with local node.js test server config
+        IMClient.init(this, "192.168.1.5", 8090)
         ImUIKitImpl.setSessionEventListener(sessionEventListener {
             onAvatarClickListener {
                 Toast.makeText(

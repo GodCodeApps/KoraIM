@@ -151,13 +151,13 @@ class MessageDao(private val dbHelper: ImAppDatabaseHelper) {
         notifyChange()
     }
 
-    fun getMessageByMessageId(messageId: String): Message {
+    fun getMessageByMessageId(messageId: String): Message? {
         val db = dbHelper.readableDatabase
         val cursor = db.rawQuery(
             "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE messageId = ?",
             arrayOf(messageId)
         )
-        return parseMessageList(cursor).firstOrNull() ?: Message()
+        return parseMessageList(cursor).firstOrNull()
     }
 
     suspend fun insertMessage(vararg message: Message) = withContext(Dispatchers.IO) {
