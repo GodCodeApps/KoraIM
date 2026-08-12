@@ -49,7 +49,7 @@ class IMService : Service() {
                         .group(group)
                         .option(ChannelOption.TCP_NODELAY, true)//无阻塞
                         .option(ChannelOption.SO_KEEPALIVE, true)//长链接
-                        .option(ChannelOption.SO_TIMEOUT, 3000)//收发超时
+                        .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 3000)//连接超时
                         .option(
                             ChannelOption.RCVBUF_ALLOCATOR,
                             AdaptiveRecvByteBufAllocator(5000, 5000, 8000)
@@ -133,7 +133,7 @@ class IMService : Service() {
                     Log.d(TAG, "链接失败")
                     cb?.invoke(false)
                 }
-            }?.sync()
+            }
         }
     }
 }

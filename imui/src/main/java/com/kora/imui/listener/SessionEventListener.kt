@@ -13,6 +13,7 @@ open class SessionEventListener {
     private var onAvatarClickListener: ((account: String?) -> Unit)? = null
     private var onAvatarLongClickListener: ((account: String?) -> Unit)? = null
     private var onItemClickListener: ((message: IMMessage?) -> Unit)? = null
+    private var onResendClickListener: ((message: IMMessage?) -> Unit)? = null
     fun onAvatarClickListener(avatarClickListener: ((account: String?) -> Unit)?) {
         this.onAvatarClickListener = avatarClickListener
     }
@@ -24,9 +25,15 @@ open class SessionEventListener {
     fun onItemClickListener(itemClickListener: ((message: IMMessage?) -> Unit)?) {
         this.onItemClickListener = itemClickListener
     }
+    
+    fun onResendClickListener(resendClickListener: ((message: IMMessage?) -> Unit)?) {
+        this.onResendClickListener = resendClickListener
+    }
+
     fun getAvatarClickListener(): ((account: String?) -> Unit)? = onAvatarClickListener
     fun getAvatarLongClickListener(): ((account: String?) -> Unit)? = onAvatarLongClickListener
     fun getItemClickListener(): ((message: IMMessage?) -> Unit)? = onItemClickListener
+    fun getResendClickListener(): ((message: IMMessage?) -> Unit)? = onResendClickListener
 
 }
 

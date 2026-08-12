@@ -167,7 +167,7 @@ object IMClient {
     fun updateMessageToLocal(message: Message) {
         imScope.launch {
             if (null != messageDao.getMessageByMessageId(message.getMsgId())) {
-                messageDao.updateMessage(message.getMsgId())
+                messageDao.updateMessage(message.getMsgId(), message.getMsgStatus())
             } else {
                 messageDao.insertMessage(message)
             }

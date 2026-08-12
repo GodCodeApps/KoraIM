@@ -88,6 +88,9 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
             contentContainer?.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#95EC69")) // 微信绿
             setGravity(llBody, Gravity.RIGHT)
             setMsgStatus(progress, ivMsgStatus)
+            ivMsgStatus.setOnClickListener {
+                ImUIKitImpl.getSessionListener()?.getResendClickListener()?.invoke(mMessage)
+            }
         }
         
         // 统一处理头像加载与默认头像兜底

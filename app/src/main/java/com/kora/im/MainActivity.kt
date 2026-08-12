@@ -40,6 +40,14 @@ class MainActivity : AppCompatActivity() {
                     Toast.LENGTH_LONG
                 ).show()
             }
+            onResendClickListener { msg ->
+                if (msg != null && msg is com.kora.imcore.db.Message) {
+                    msg.status = com.zchd.vsports.im.core.constant.MsgStatus.SENDING
+                    IMClient.updateMessageToLocal(msg)
+                    IMClient.getMessageChangeListener()?.invoke(msg)
+                    IMClient.sendMessage(msg)
+                }
+            }
         })
 
     }

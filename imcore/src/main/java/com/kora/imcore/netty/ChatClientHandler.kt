@@ -36,6 +36,7 @@ class ChatClientHandler : ChannelInboundHandlerAdapter() {
         val value = msg.toString()
         Log.e("IWebSocketListener", "channelRead>>${msg}")
         var message = Gson().fromJson(value, Message::class.java)
+        message.id = 0 // 清除服务器回传的本地主键ID，防止数据库冲突
         message.status = MsgStatus.SUCCESS
         if (message.direct == MsgDirection.IN) {
             android.os.Handler(android.os.Looper.getMainLooper()).post {
