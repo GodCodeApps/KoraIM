@@ -31,3 +31,4 @@ dependencyResolutionManagement {
 rootProject.name = "KoraIM"
 include(":app")
 include(":imcore")
+include(":imui")

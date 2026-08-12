@@ -8,12 +8,14 @@ appcompat = "1.7.1"
 material = "1.14.0"
 activityKtx = "1.13.0"
 constraintlayout = "2.2.2"
-kotlin = "2.2.10"
 netty = "4.1.48.Final"
 #4.1.48.Final
 gson = "2.8.9"
-room = "2.3.0"
+room = "2.7.0"
 livedataKtx="2.2.0"
+refreshLayout="1.1.0"
+kotlin = "2.2.10"
+ksp="2.2.10-2.0.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -30,8 +32,11 @@ roomCompiler = { group = "androidx.room", name = "room-compiler", version.ref = 
 roomKtx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 livedataKtx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "livedataKtx" }
 
+refreshLayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "refreshLayout" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 android-library = {id = "com.android.library", version.ref = "agp"}
+kotlin-kapt = {id = "org.jetbrains.kotlin.kapt"}

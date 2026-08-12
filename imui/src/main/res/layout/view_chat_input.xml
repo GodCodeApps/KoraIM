@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- 主输入栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:background="#F7F7F7">
+
+        <ImageView
+            android:id="@+id/iv_voice"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_voice"
+            android:contentDescription="语音输入" />
+
+        <EditText
+            android:id="@+id/et_message"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:maxHeight="120dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:background="@android:drawable/edit_text"
+            android:hint="输入消息..."
+            android:maxLines="4"
+            android:padding="10dp" />
+
+        <ImageView
+            android:id="@+id/iv_emoji"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_emoji"
+            android:contentDescription="表情" />
+
+        <ImageView
+            android:id="@+id/iv_more"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/ic_add"
+            android:contentDescription="更多功能" />
+
+        <!-- 发送按钮，默认隐藏 -->
+        <TextView
+            android:id="@+id/btn_send"
+            android:layout_width="60dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:text="发送"
+            android:gravity="center"
+            android:background="@android:color/holo_green_light"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+    <!-- “更多”功能面板 (默认隐藏) -->
+    <FrameLayout
+        android:id="@+id/panel_more"
+        android:layout_width="match_parent"
+        android:layout_height="250dp"
+        android:background="#FFFFFF"
+        android:visibility="gone">
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_more_options"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
+    <!-- 表情面板 (默认隐藏) -->
+    <FrameLayout
+        android:id="@+id/panel_emoji"
+        android:layout_width="match_parent"
+        android:layout_height="250dp"
+        android:background="#FFFFFF"
+        android:visibility="gone">
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_emoji"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
+</LinearLayout>
