@@ -4,7 +4,10 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
+import com.google.gson.Gson
 import com.kora.imcore.aidl.ImAidlInterface
+import com.kora.imcore.db.Message
+import com.zchd.vsports.im.core.constant.MsgStatus
 import com.kora.imcore.netty.ChatClientInitializer
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.AdaptiveRecvByteBufAllocator
@@ -61,18 +64,57 @@ class IMService : Service() {
 
         override fun send(msg: String?) {
             if (msg != null && msg.isNotEmpty()) {
-                Log.d(TAG, "send${msg}")
+                Log.d(TAG, "send: $msg")
+                val message = try {
+                    Gson().fromJson(msg, Message::class.java)
+                } catch (e: Exception) {
+                    null
+                } ?: return
+
+                val handler = android.os.Handler(android.os.Looper.getMainLooper())
+                var isDone = false
+
+                val timeoutRunnable = Runnable {
+                    if (!isDone) {
+                        isDone = true
+                        Log.d(TAG, "send timeout!")
+                        message.status = MsgStatus.FAIL
+                        IMClient.updateMessageToLocal(message)
+                        IMClient.getMessageChangeListener()?.invoke(message)
+                    }
+                }
+                
+                // 10 seconds timeout for sending
+                handler.postDelayed(timeoutRunnable, 10000)
+
+                val futureListener = io.netty.channel.ChannelFutureListener { future ->
+                    handler.post {
+                        if (!isDone) {
+                            isDone = true
+                            handler.removeCallbacks(timeoutRunnable)
+                            if (future != null && future.isSuccess) {
+                                Log.d(TAG, "send success")
+                                message.status = MsgStatus.SUCCESS
+                            } else {
+                                Log.d(TAG, "send failed")
+                                message.status = MsgStatus.FAIL
+                            }
+                            IMClient.updateMessageToLocal(message)
+                            IMClient.getMessageChangeListener()?.invoke(message)
+                        }
+                    }
+                }
+
                 if (needReConnect()) {
-                    connect {
-                        channelFuture?.channel()?.writeAndFlush(msg)?.addListener {
-                            Log.d(TAG, "send》》》${it.isSuccess}")
+                    connect { success ->
+                        if (success) {
+                            channelFuture?.channel()?.writeAndFlush(msg)?.addListener(futureListener)
+                        } else {
+                            handler.post { futureListener.operationComplete(null) }
                         }
                     }
                 } else {
-                    channelFuture?.channel()?.writeAndFlush(msg)?.addListener {
-                        Log.d(TAG, "send》》》${it.isSuccess}")
-                    }
-
+                    channelFuture?.channel()?.writeAndFlush(msg)?.addListener(futureListener)
                 }
             }
         }

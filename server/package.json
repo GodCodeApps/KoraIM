@@ -1,0 +1,11 @@
+{
+  "name": "kora-im-server",
+  "version": "1.0.0",
+  "description": "A simple raw TCP test server for KoraIM Android client",
+  "main": "im_server.js",
+  "scripts": {
+    "start": "node im_server.js"
+  },
+  "author": "",
+  "license": "ISC"
+}

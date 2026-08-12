@@ -99,10 +99,8 @@ class InputPanel(
                 // 创建一个新的 MessageItem
                 val createTextMessage = createTextMessage(sessionId, sessionType, msg = message)
                 // 添加到适配器并滚动到底部
-                messageListPanelEx.addItemMsg(createTextMessage)
-
-                // (可选) 模拟接收一条消息
-                simulateReceiveMessage()
+//                messageListPanelEx.addItemMsg(createTextMessage)
+                proxy?.sendMessage(createTextMessage)
             }
 
             override fun onVoiceClick() {

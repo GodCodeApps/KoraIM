@@ -19,7 +19,7 @@ class ImServiceProxy : ServiceConnection {
     }
     override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
         asInterface = ImAidlInterface.Stub.asInterface(service)
-        asInterface?.connect("192.168.0.71", 8090)
+        asInterface?.connect("192.168.1.5", 8090)
     }
 
     override fun onServiceDisconnected(name: ComponentName?) {

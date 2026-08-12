@@ -38,11 +38,15 @@ class ChatClientHandler : ChannelInboundHandlerAdapter() {
         var message = Gson().fromJson(value, Message::class.java)
         message.status = MsgStatus.SUCCESS
         if (message.direct == MsgDirection.IN) {
-            IMClient.getReceiveListener()?.forEach {
-                it?.invoke(message)
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                IMClient.getReceiveListener()?.forEach {
+                    it?.invoke(message)
+                }
             }
         } else {
-            IMClient.getMessageChangeListener()?.invoke(message)
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                IMClient.getMessageChangeListener()?.invoke(message)
+            }
         }
         IMClient.updateMessageToLocal(message)
     }
