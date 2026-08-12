@@ -4,12 +4,15 @@ import android.text.TextUtils
 import android.view.View
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import com.kora.imcore.ImSdkImpl
 import com.kora.imcore.constant.MsgDirection
 import com.kora.imcore.constant.SessionType
+import com.kora.imcore.db.Message
 import com.kora.imui.MessageBuilder.createTextMessage
 import com.kora.imui.MessageBuilder.createImageMessage
 import com.kora.imui.MessageListPanelEx
 import com.kora.imui.R
+import com.kora.imui.attachment.VoiceAttachment
 import com.kora.imui.bean.BaseInputAction
 import com.kora.imui.inputbox.ChatInputView
 import com.kora.imui.inputbox.ChatInputView.OnInputListener
@@ -19,6 +22,7 @@ import com.luck.picture.lib.basic.PictureSelector
 import com.luck.picture.lib.config.SelectMimeType
 import com.luck.picture.lib.entity.LocalMedia
 import com.luck.picture.lib.interfaces.OnResultCallbackListener
+import com.zchd.vsports.im.core.constant.MsgStatus
 
 
 /**
@@ -153,16 +157,69 @@ class InputPanel(
                 chatInputView.insertText(emojiTag)
             }
 
+            private var audioRecordHelper: com.kora.imui.utils.AudioRecordHelper? = null
+            private var toast: Toast? = null
+
+            private fun checkPermission(): Boolean {
+                val context = fragment.context ?: return false
+                if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    fragment.requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 1001)
+                    return false
+                }
+                return true
+            }
+
             override fun onVoiceRecordStart() {
-                // TODO: 启动录音UI并开始录音
+                if (!checkPermission()) return
+                
+                if (audioRecordHelper == null) {
+                    val cacheDir = fragment.context?.cacheDir
+                    if (cacheDir != null) {
+                        audioRecordHelper = com.kora.imui.utils.AudioRecordHelper(cacheDir)
+                    }
+                }
+                
+                audioRecordHelper?.startRecording()
+                toast = Toast.makeText(fragment.context, "正在录音... 上滑取消", Toast.LENGTH_SHORT)
+                toast?.show()
             }
 
             override fun onVoiceRecordEnd() {
-                // TODO: 结束录音并发送语音消息
+                toast?.cancel()
+                val result = audioRecordHelper?.stopRecording()
+                if (result != null) {
+                    val path = result.first
+                    val duration = result.second
+                    
+                    if (duration < 1000) {
+                        Toast.makeText(fragment.context, "录音时间太短", Toast.LENGTH_SHORT).show()
+                        return
+                    }
+
+                    // Create VoiceAttachment
+                    val voiceAttach = VoiceAttachment().apply {
+                        this.path = path
+                        this.duration = duration
+                    }
+                    val msg = Message(
+                        sessionType = sessionType,
+                        sessionId = sessionId,
+                        account = ImSdkImpl.getAccount() ?: "",
+                        type = voiceAttach.getMsgType(),
+                        direct = MsgDirection.OUT,
+                        status = MsgStatus.SENDING,
+                        time = System.currentTimeMillis(),
+                        attachment = voiceAttach.toJson(false)
+                    )
+                    com.kora.imcore.IMClient.sendMessage(msg)
+                    messageListPanelEx.addItemMsg(msg)
+                }
             }
 
             override fun onVoiceRecordCancel() {
-                // TODO: 取消录音并隐藏录音UI
+                toast?.cancel()
+                Toast.makeText(fragment.context, "已取消录音", Toast.LENGTH_SHORT).show()
+                audioRecordHelper?.cancelRecording()
             }
         })
 

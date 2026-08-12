@@ -5,6 +5,7 @@ import com.kora.imcore.impl.IMMessage
 import com.kora.imui.attachment.ImageAttachment
 import com.kora.imui.attachment.TextAttachment
 import com.kora.imui.attachment.UnknownAttachment
+import com.kora.imui.attachment.VoiceAttachment
 import kotlin.collections.get
 
 /**
@@ -18,6 +19,7 @@ object MsgViewHolderFactory {
         mutableMapOf(
             TextAttachment::class.java to MsgTextViewHolder::class.java,
             ImageAttachment::class.java to MsgImageViewHolder::class.java,
+            VoiceAttachment::class.java to MsgVoiceViewHolder::class.java,
             UnknownAttachment::class.java to MsgUnknownViewHolder::class.java
         )
 

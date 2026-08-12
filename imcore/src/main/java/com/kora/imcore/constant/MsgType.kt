@@ -17,5 +17,6 @@ annotation class MsgType {
         const val IMAGE = 2
         const val VIDEO = 3
         const val TIP = 4
+        const val VOICE = 5
     }
 }

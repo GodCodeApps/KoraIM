@@ -1,0 +1,19 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Frame 1 inner arc -->
+    <path
+        android:strokeColor="#333333"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M9,9 c1.5,1.5 1.5,4.5 0,6" />
+        
+    <!-- Frame 2 middle arc -->
+    <path
+        android:strokeColor="#333333"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M12,6 c3,3 3,9 0,12" />
+</vector>
