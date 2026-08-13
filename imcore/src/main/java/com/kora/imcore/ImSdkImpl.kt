@@ -13,6 +13,7 @@ object ImSdkImpl {
     private var mAccount: String? = null
     private var msgAttachmentList = arrayListOf<MsgAttachment>()
     fun init() {
+        msgAttachmentList.clear()
         val loader: ServiceLoader<MsgAttachment> = ServiceLoader.load(MsgAttachment::class.java)
         msgAttachmentList.addAll(loader.toMutableList())
     }

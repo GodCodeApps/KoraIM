@@ -37,6 +37,9 @@ object IMClient {
     fun init(context: Context, host: String, port: Int) {
         require(host.isNotBlank()) { "host must not be blank" }
         require(port in 1..65535) { "port must be between 1 and 65535" }
+        val account = requireNotNull(ImSdkImpl.getAccount()?.takeIf { it.isNotBlank() }) {
+            "Call ImSdkImpl.setAccount(account) before IMClient.init"
+        }
         release()
         val appContext = context.applicationContext
         val database = ImAppDatabaseHelper(appContext)
@@ -44,7 +47,7 @@ object IMClient {
         userRepository = UserRepository(UserDao(database), IMRuntime.scope)
         IMRuntime.messages = messageRepository
         ImSdkImpl.init()
-        connectionManager = ConnectionManager(appContext).also { it.connect(host, port) }
+        connectionManager = ConnectionManager(appContext).also { it.connect(host, port, account) }
     }
 
     suspend fun sendMessage(message: IMMessage) {

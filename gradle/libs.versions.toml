@@ -12,7 +12,7 @@ netty = "4.1.48.Final"
 #4.1.48.Final
 gson = "2.8.9"
 room = "2.7.0"
-livedataKtx="2.2.0"
+lifecycle="2.11.0"
 refreshLayout="1.1.0"
 kotlin = "2.2.10"
 glide = "4.16.0"
@@ -30,7 +30,8 @@ androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", ve
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 netty = { group = "io.netty", name = "netty-all", version.ref = "netty" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
-livedataKtx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "livedataKtx" }
+livedataKtx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "lifecycle" }
+lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
 refreshLayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "refreshLayout" }
 glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "glide" }
 pictureselector = { group = "io.github.lucksiege", name = "pictureselector", version.ref = "pictureselector" }

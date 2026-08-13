@@ -14,6 +14,7 @@ import com.kora.imcore.constant.SessionType
  * @Description:
  */
 class P2PMessageFragment : Fragment() {
+    private val peerAccount get() = requireArguments().getString(ARG_PEER).orEmpty()
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -29,9 +30,16 @@ class P2PMessageFragment : Fragment() {
             TMessageFragment().apply {
                 val apply = Bundle().apply {
                     putInt("session_type", SessionType.P2P)
-                    putString("session_id", "session123456789")
+                    putString("session_id", peerAccount)
                 }
                 arguments=apply
             }).commit()
+    }
+
+    companion object {
+        private const val ARG_PEER = "peer_account"
+        fun newInstance(account: String) = P2PMessageFragment().apply {
+            arguments = Bundle().apply { putString(ARG_PEER, account) }
+        }
     }
 }

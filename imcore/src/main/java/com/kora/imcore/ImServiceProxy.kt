@@ -13,11 +13,13 @@ internal class ImServiceProxy : ServiceConnection {
     private var service: IMService? = null
     private var host = ""
     private var port = 0
+    private var account = ""
     private val pendingMessages = ConcurrentLinkedQueue<String>()
 
-    fun setServerConfig(host: String, port: Int) {
+    fun setServerConfig(host: String, port: Int, account: String) {
         this.host = host
         this.port = port
+        this.account = account
     }
 
     fun sendMessage(message: String) {
@@ -34,7 +36,7 @@ internal class ImServiceProxy : ServiceConnection {
     override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
         service = (binder as? IMService.LocalBinder)?.service
         val connectedService = service ?: return
-        connectedService.connect(host, port)
+        connectedService.connect(host, port, account)
         while (true) connectedService.send(pendingMessages.poll() ?: break)
     }
 
