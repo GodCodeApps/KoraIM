@@ -7,6 +7,7 @@ import com.kora.imcore.db.Message
 import com.kora.imcore.db.MessageDao
 import com.kora.imcore.db.Conversation
 import com.kora.imcore.db.ConversationDao
+import com.kora.imcore.db.SyncStateDao
 import com.kora.imcore.db.UserDao
 import com.kora.imcore.db.UserInfo
 import com.kora.imcore.event.ConnectionState
@@ -46,13 +47,15 @@ object IMClient {
         release()
         val appContext = context.applicationContext
         val database = ImAppDatabaseHelper(appContext)
+        val syncCursor = SyncStateDao(database).getCursor(account)
         conversationDao = ConversationDao(database)
         messageRepository = MessageRepository(MessageDao(database, conversationDao))
         userRepository = UserRepository(UserDao(database), IMRuntime.scope)
         IMRuntime.messages = messageRepository
         IMRuntime.ownerId = account
+        IMRuntime.syncCursor = syncCursor
         ImSdkImpl.init()
-        connectionManager = ConnectionManager(appContext).also { it.connect(host, port, account) }
+        connectionManager = ConnectionManager(appContext).also { it.connect(host, port, account, syncCursor) }
     }
 
     suspend fun sendMessage(message: IMMessage) {

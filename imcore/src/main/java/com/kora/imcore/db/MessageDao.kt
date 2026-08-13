@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import com.kora.imcore.netty.SyncEvent
 
 /**
  * Copyright 2026 GodCodeApps
@@ -138,6 +139,53 @@ class MessageDao(
                 values,
                 "messageId = ?",
                 arrayOf(message.messageId)
+            )
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        notifyChange()
+    }
+
+    internal suspend fun applySync(ownerId: String, events: List<SyncEvent>, cursor: Long) = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            events.forEach { event ->
+                val message = event.payload ?: return@forEach
+                message.id = 0
+                message.status = MsgStatus.SUCCESS
+                message.direct = if (message.senderId == ownerId) {
+                    com.kora.imcore.constant.MsgDirection.OUT
+                } else {
+                    com.kora.imcore.constant.MsgDirection.IN
+                }
+                db.insertWithOnConflict(
+                    ImAppDatabaseHelper.TABLE_MESSAGE,
+                    null,
+                    messageToContentValues(message),
+                    SQLiteDatabase.CONFLICT_IGNORE
+                )
+                conversationDao.upsertInTransaction(
+                    db,
+                    Conversation(
+                        sessionId = message.sessionId,
+                        sessionType = message.sessionType,
+                        ownerId = ownerId,
+                        peerId = if (message.senderId == ownerId) message.receiverId else message.senderId,
+                        updateTime = message.time
+                    )
+                )
+            }
+            db.insertWithOnConflict(
+                ImAppDatabaseHelper.TABLE_SYNC_STATE,
+                null,
+                ContentValues().apply {
+                    put("ownerId", ownerId)
+                    put("cursor", cursor)
+                    put("updateTime", System.currentTimeMillis())
+                },
+                SQLiteDatabase.CONFLICT_REPLACE
             )
             db.setTransactionSuccessful()
         } finally {

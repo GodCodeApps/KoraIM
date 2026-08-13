@@ -13,6 +13,7 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
         const val TABLE_MESSAGE = "message"
         const val TABLE_USER_INFO = "user_info"
         const val TABLE_CONVERSATION = "conversation"
+        const val TABLE_SYNC_STATE = "sync_state"
         
         // Table columns
         const val COLUMN_ID = "id"
@@ -67,12 +68,20 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
         db.execSQL(
             """CREATE TABLE IF NOT EXISTS $TABLE_CONVERSATION (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                sessionId TEXT NOT NULL UNIQUE,
+                sessionId TEXT NOT NULL,
                 sessionType INTEGER NOT NULL,
                 ownerId TEXT NOT NULL,
                 peerId TEXT NOT NULL DEFAULT '',
                 updateTime INTEGER NOT NULL,
+                UNIQUE(ownerId, sessionId),
                 UNIQUE(ownerId, sessionType, peerId)
+            )""".trimIndent()
+        )
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS $TABLE_SYNC_STATE (
+                ownerId TEXT PRIMARY KEY NOT NULL,
+                cursor INTEGER NOT NULL,
+                updateTime INTEGER NOT NULL
             )""".trimIndent()
         )
         createIndexes(db)

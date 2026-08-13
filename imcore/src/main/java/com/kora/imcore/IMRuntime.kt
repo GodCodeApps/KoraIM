@@ -7,11 +7,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import com.kora.imcore.netty.SyncEvent
 
 internal object IMRuntime {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     lateinit var messages: MessageRepository
     var ownerId: String = ""
+    @Volatile var syncCursor: Long = 0L
 
     fun incoming(message: Message) {
         scope.launch {
@@ -29,6 +31,15 @@ internal object IMRuntime {
                 messages.upsert(message)
             }
             IMEventHub.emitUpdate(message)
+        }
+    }
+
+    fun synced(events: List<SyncEvent>, cursor: Long, onCommitted: () -> Unit) {
+        scope.launch {
+            messages.applySync(ownerId, events, cursor)
+            syncCursor = cursor
+            events.mapNotNull { it.payload }.forEach(IMEventHub::emitIncoming)
+            onCommitted()
         }
     }
 }

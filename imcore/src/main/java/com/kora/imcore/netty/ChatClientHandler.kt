@@ -25,6 +25,16 @@ internal class ChatClientHandler(
                     ctx.writeAndFlush(gson.toJson(WireEnvelope(WireEnvelope.TYPE_ACK, envelope.messageId)) + "\n")
                     deliverMessage(message)
                 }
+                WireEnvelope.TYPE_SYNC_RESULT -> {
+                    val events = envelope.events.orEmpty()
+                    val nextCursor = envelope.nextCursor ?: 0L
+                    IMRuntime.synced(events, nextCursor) {
+                        ctx.writeAndFlush(WireEnvelope.syncAck(nextCursor).encode(gson))
+                        if (envelope.hasMore == true) {
+                            ctx.writeAndFlush(WireEnvelope.sync(nextCursor).encode(gson))
+                        }
+                    }
+                }
                 else -> Log.w(TAG, "Ignoring unknown frame type: ${envelope.type}")
             }
         } catch (error: Exception) {

@@ -34,6 +34,7 @@ class IMService : Service() {
     private var host = ""
     private var port = 0
     private var account = ""
+    private var syncCursor = 0L
     private var reconnectAttempt = 0
     private var released = false
     private val outgoingMessages = ConcurrentLinkedQueue<Message>()
@@ -43,10 +44,11 @@ class IMService : Service() {
 
     override fun onBind(intent: Intent?): IBinder = binder
 
-    internal fun connect(host: String, port: Int, account: String) {
+    internal fun connect(host: String, port: Int, account: String, syncCursor: Long) {
         this.host = host
         this.port = port
         this.account = account
+        this.syncCursor = syncCursor
         released = false
         connectIfNeeded()
     }
@@ -90,6 +92,7 @@ class IMService : Service() {
                 Log.i(TAG, "Connected to $host:$port")
                 IMEventHub.setConnectionState(ConnectionState.Connected(host, port))
                 channel?.writeAndFlush(WireEnvelope.login(account).encode(gson))
+                channel?.writeAndFlush(WireEnvelope.sync(IMRuntime.syncCursor).encode(gson))
                 drainOutgoingMessages()
             } else {
                 Log.w(TAG, "Connection failed", future.cause())

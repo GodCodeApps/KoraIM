@@ -4,6 +4,9 @@ const crypto = require('crypto');
 const PORT = Number(process.env.PORT || 8090);
 const clients = new Map();
 const p2pSessions = new Map();
+const userEvents = new Map();
+const userCursors = new Map();
+const SYNC_PAGE_SIZE = 100;
 
 function p2pKey(first, second) {
     return [first, second].sort().join(':');
@@ -18,6 +21,16 @@ function findOrCreateP2PSession(first, second) {
         console.log(`[+] Created P2P session ${sessionId} for ${key}`);
     }
     return sessionId;
+}
+
+function appendUserEvent(userId, payload) {
+    const cursor = (userCursors.get(userId) || 0) + 1;
+    userCursors.set(userId, cursor);
+    const event = { cursor, eventType: 'message', payload };
+    const events = userEvents.get(userId) || [];
+    events.push(event);
+    userEvents.set(userId, events);
+    return event;
 }
 
 function writeFrame(socket, frame) {
@@ -60,6 +73,21 @@ function handleFrame(socket, line) {
         // The Android client acknowledges delivered incoming messages. Delivery
         // receipts are intentionally not persisted by this minimal demo server.
         if (envelope.type === 'ack') return;
+        if (envelope.type === 'sync_ack') return;
+        if (envelope.type === 'sync') {
+            if (!socket.account) throw new Error('Login required');
+            const cursor = Math.max(0, Number(envelope.cursor || 0));
+            const pending = (userEvents.get(socket.account) || []).filter(event => event.cursor > cursor);
+            const events = pending.slice(0, SYNC_PAGE_SIZE);
+            const nextCursor = events.length ? events[events.length - 1].cursor : cursor;
+            writeFrame(socket, {
+                type: 'sync_result',
+                events,
+                nextCursor,
+                hasMore: pending.length > events.length
+            });
+            return;
+        }
         if (envelope.type !== 'message' || !envelope.payload || !envelope.messageId) {
             throw new Error('Unsupported frame');
         }
@@ -67,12 +95,6 @@ function handleFrame(socket, line) {
 
         const recipientId = String(envelope.payload.receiverId || '').trim();
         if (!recipientId || recipientId === socket.account) throw new Error('Invalid receiverId');
-        const recipient = clients.get(recipientId);
-        if (!recipient || recipient.destroyed) {
-            console.log(`[>] ${socket.account} -> ${recipientId} (offline)`);
-            return;
-        }
-
         const sessionId = findOrCreateP2PSession(socket.account, recipientId);
 
         const incoming = {
@@ -85,9 +107,21 @@ function handleFrame(socket, line) {
             status: 1,
             time: Date.now()
         };
-        writeFrame(recipient, { type: 'message', messageId: incoming.messageId, payload: incoming });
+        appendUserEvent(socket.account, incoming);
+        const event = appendUserEvent(recipientId, incoming);
         writeFrame(socket, { type: 'ack', messageId: envelope.messageId, success: true, sessionId });
-        console.log(`[>] ${socket.account} -> ${recipient.account}`);
+        const recipient = clients.get(recipientId);
+        if (recipient && !recipient.destroyed) {
+            writeFrame(recipient, {
+                type: 'message',
+                messageId: incoming.messageId,
+                cursor: event.cursor,
+                payload: incoming
+            });
+            console.log(`[>] ${socket.account} -> ${recipientId}`);
+        } else {
+            console.log(`[>] ${socket.account} -> ${recipientId} (stored offline)`);
+        }
     } catch (error) {
         console.error(`[!] Invalid frame: ${error.message}`);
     }

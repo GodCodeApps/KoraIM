@@ -12,9 +12,9 @@ internal class ConnectionManager(private val context: Context) {
     private val proxy = ImServiceProxy()
     private var bound = false
 
-    fun connect(host: String, port: Int, account: String) {
+    fun connect(host: String, port: Int, account: String, syncCursor: Long) {
         disconnect()
-        proxy.setServerConfig(host, port, account)
+        proxy.setServerConfig(host, port, account, syncCursor)
         bound = context.bindService(Intent(context, IMService::class.java), proxy, Context.BIND_AUTO_CREATE)
         check(bound) { "Unable to bind KoraIM service" }
     }
