@@ -40,6 +40,7 @@ public class ChatInputView extends LinearLayout {
     private FrameLayout panelEmoji;
 
     private int keyboardHeight = 0;
+    private int fallbackPanelHeight;
     private OnInputListener listener;
     private RecyclerView rvMoreOptions;
     private RecyclerView rvEmoji;
@@ -79,6 +80,7 @@ public class ChatInputView extends LinearLayout {
     private void init(Context context) {
         LayoutInflater.from(context).inflate(R.layout.view_chat_input, this, true);
         setOrientation(VERTICAL);
+        fallbackPanelHeight = (int) (250 * context.getResources().getDisplayMetrics().density + 0.5f);
 
         ivVoice = findViewById(R.id.iv_voice);
         etMessage = findViewById(R.id.et_message);
@@ -233,8 +235,9 @@ public class ChatInputView extends LinearLayout {
                 updateSendButtonState();
                 
                 if (oldMode == InputMode.TEXT) {
+                    preparePanel(panelEmoji);
+                    panelEmoji.setVisibility(VISIBLE);
                     hideKeyboard();
-                    postDelayed(() -> showPanel(panelEmoji), 100);
                 } else {
                     hideKeyboard();
                     hideAllPanels();
@@ -248,8 +251,9 @@ public class ChatInputView extends LinearLayout {
                 updateSendButtonState();
                 
                 if (oldMode == InputMode.TEXT) {
+                    preparePanel(panelMore);
+                    panelMore.setVisibility(VISIBLE);
                     hideKeyboard();
-                    postDelayed(() -> showPanel(panelMore), 100);
                 } else {
                     hideKeyboard();
                     hideAllPanels();
@@ -265,11 +269,16 @@ public class ChatInputView extends LinearLayout {
     }
     
     private void showPanel(View panel) {
-        if (keyboardHeight > 0) {
-            panel.getLayoutParams().height = keyboardHeight;
+        preparePanel(panel);
+        panel.setVisibility(VISIBLE);
+    }
+
+    private void preparePanel(View panel) {
+        int targetHeight = keyboardHeight > 0 ? keyboardHeight : fallbackPanelHeight;
+        if (panel.getLayoutParams().height != targetHeight) {
+            panel.getLayoutParams().height = targetHeight;
             panel.requestLayout();
         }
-        panel.setVisibility(VISIBLE);
     }
 
     private void setupKeyboardListener() {

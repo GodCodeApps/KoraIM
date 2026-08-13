@@ -1,15 +1,12 @@
 package com.kora.imui
 
 import android.content.Context
-import android.graphics.Rect
-import android.util.DisplayMetrics
 import android.util.Log
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.widget.AppCompatEditText
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.lifecycle.lifecycleScope
@@ -39,14 +36,8 @@ class MessageListPanelEx(
     private var mMessageAdapter: MsgListAdapter? = null
     private var mPage = 0
     private var mLinearLayoutManager: LinearLayoutManager? = null
-    private fun createSmoothScroller(): LinearSmoothScroller {
-        return object : LinearSmoothScroller(context.requireContext()) {
-            override fun calculateSpeedPerPixel(displayMetrics: DisplayMetrics?): Float {
-                return 0.0000000000000000001f
-            }
-        }
-    }
-
+    private var userNearBottom = true
+    private var lastRecyclerHeight = 0
     init {
         mPage = 0
         mMessageAdapter = MsgListAdapter()
@@ -57,6 +48,22 @@ class MessageListPanelEx(
         recyclerVew.layoutManager = mLinearLayoutManager
         recyclerVew.adapter = mMessageAdapter
         recyclerVew.itemAnimator?.changeDuration = 0
+        recyclerVew.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                userNearBottom = isNearBottom()
+            }
+        })
+        recyclerVew.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
+            val newHeight = bottom - top
+            val oldHeight = oldBottom - oldTop
+            if (lastRecyclerHeight == 0) lastRecyclerHeight = oldHeight
+            if (newHeight != oldHeight && userNearBottom) {
+                // The IME and the emoji/more panels resize the message viewport.
+                // Re-anchor only when the user was already reading the latest message.
+                scrollToBottom()
+            }
+            lastRecyclerHeight = newHeight
+        }
         observeMessages()
 //        refreshLayout?.setOnRefreshListener {
 //            mPage++
@@ -65,16 +72,6 @@ class MessageListPanelEx(
         /**
          * 监听键盘弹起
          */
-        var height = 0
-        rootView.post { height = rootView.height }
-        rootView.viewTreeObserver.addOnGlobalLayoutListener {
-            val r = Rect()
-            rootView.getWindowVisibleDisplayFrame(r)
-            val visibleHeight: Int = r.height()
-            if (height != visibleHeight) {
-                scrollToBottom()
-            }
-        }
         var imm =
             context.context?.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         recyclerVew.setOnTouchListener { v, event ->
@@ -93,9 +90,32 @@ class MessageListPanelEx(
                 }
                 messages.collect {
                     Log.e("loadMessageHistory", it.toString())
-                    mMessageAdapter?.clear()
-                    mMessageAdapter?.addList(it)
-                    scrollToBottom()
+                    val wasEmpty = (mMessageAdapter?.itemCount ?: 0) == 0
+                    val shouldScrollToBottom = wasEmpty || userNearBottom
+                    val anchorPosition = mLinearLayoutManager?.findFirstVisibleItemPosition() ?: -1
+                    val anchorMessageId = if (!shouldScrollToBottom && anchorPosition >= 0) {
+                        mMessageAdapter?.getMessageId(anchorPosition)
+                    } else null
+                    // The list uses reverseLayout=true, so LinearLayoutManager interprets
+                    // the offset from the resolved end (the RecyclerView bottom), not top.
+                    val anchorOffset = if (anchorPosition >= 0) {
+                        val anchorView = mLinearLayoutManager?.findViewByPosition(anchorPosition)
+                        if (anchorView != null) {
+                            recyclerVew.height - recyclerVew.paddingBottom - anchorView.bottom
+                        } else 0
+                    } else 0
+
+                    mMessageAdapter?.replaceAll(it)
+                    if (shouldScrollToBottom) {
+                        scrollToBottom()
+                    } else if (anchorMessageId != null) {
+                        recyclerVew.post {
+                            val newPosition = mMessageAdapter?.indexOfMessage(anchorMessageId) ?: -1
+                            if (newPosition >= 0) {
+                                mLinearLayoutManager?.scrollToPositionWithOffset(newPosition, anchorOffset)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -103,14 +123,20 @@ class MessageListPanelEx(
 
     fun addItemMsg(message: IMMessage) {
         mMessageAdapter?.addItem(message)
+        userNearBottom = true
         scrollToBottom()
     }
 
+    private fun isNearBottom(): Boolean {
+        val firstVisible = mLinearLayoutManager?.findFirstVisibleItemPosition() ?: return true
+        return firstVisible <= 1
+    }
+
     private fun scrollToBottom() {
-        if (recyclerVew?.isAttachedToWindow == true) {
-            val scroller = createSmoothScroller()
-            scroller.targetPosition = 0
-            mLinearLayoutManager?.startSmoothScroll(scroller)
+        recyclerVew?.post {
+            if (recyclerVew?.isAttachedToWindow == true && (mMessageAdapter?.itemCount ?: 0) > 0) {
+                mLinearLayoutManager?.scrollToPositionWithOffset(0, 0)
+            }
         }
     }
 }

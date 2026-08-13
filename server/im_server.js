@@ -63,10 +63,10 @@ function handleFrame(socket, line) {
         if (envelope.type === 'login') {
             const account = String(envelope.account || '').trim();
             if (!account) throw new Error('Account is required');
-            const previous = clients.get(account);
-            if (previous && previous !== socket) previous.end();
             socket.account = account;
-            clients.set(account, socket);
+            const accountSockets = clients.get(account) || new Set();
+            accountSockets.add(socket);
+            clients.set(account, accountSockets);
             console.log(`[=] ${account} logged in`);
             return;
         }
@@ -110,14 +110,17 @@ function handleFrame(socket, line) {
         appendUserEvent(socket.account, incoming);
         const event = appendUserEvent(recipientId, incoming);
         writeFrame(socket, { type: 'ack', messageId: envelope.messageId, success: true, sessionId });
-        const recipient = clients.get(recipientId);
-        if (recipient && !recipient.destroyed) {
-            writeFrame(recipient, {
-                type: 'message',
-                messageId: incoming.messageId,
-                cursor: event.cursor,
-                payload: incoming
-            });
+        const recipientSockets = clients.get(recipientId);
+        const activeRecipients = recipientSockets
+            ? [...recipientSockets].filter(recipient => !recipient.destroyed)
+            : [];
+        if (activeRecipients.length) {
+            activeRecipients.forEach(recipient => writeFrame(recipient, {
+                    type: 'message',
+                    messageId: incoming.messageId,
+                    cursor: event.cursor,
+                    payload: incoming
+                }));
             console.log(`[>] ${socket.account} -> ${recipientId}`);
         } else {
             console.log(`[>] ${socket.account} -> ${recipientId} (stored offline)`);
@@ -128,8 +131,10 @@ function handleFrame(socket, line) {
 }
 
 function removeClient(socket) {
-    if (socket.account && clients.get(socket.account) === socket) {
-        clients.delete(socket.account);
+    if (socket.account) {
+        const accountSockets = clients.get(socket.account);
+        accountSockets?.delete(socket);
+        if (accountSockets?.size === 0) clients.delete(socket.account);
         console.log(`[-] ${socket.account} disconnected`);
     }
 }

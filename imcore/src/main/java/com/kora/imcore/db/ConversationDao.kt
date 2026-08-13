@@ -4,12 +4,25 @@ import android.content.ContentValues
 import android.database.sqlite.SQLiteDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
 
 class ConversationDao(private val dbHelper: ImAppDatabaseHelper) {
+    private val changes = MutableStateFlow(0L)
+
+    fun observeAll(ownerId: String): Flow<List<Conversation>> =
+        changes.map { queryAll(ownerId) }.flowOn(Dispatchers.IO)
+
     suspend fun getAll(ownerId: String): List<Conversation> = withContext(Dispatchers.IO) {
-        dbHelper.readableDatabase.rawQuery(
+        queryAll(ownerId)
+    }
+
+    private fun queryAll(ownerId: String): List<Conversation> {
+        return dbHelper.readableDatabase.rawQuery(
             "SELECT * FROM ${ImAppDatabaseHelper.TABLE_CONVERSATION} " +
-                "WHERE ownerId = ? ORDER BY updateTime DESC",
+                "WHERE ownerId = ? ORDER BY lastMessageTime DESC, updateTime DESC",
             arrayOf(ownerId)
         ).use { cursor ->
             val conversations = mutableListOf<Conversation>()
@@ -31,13 +44,23 @@ class ConversationDao(private val dbHelper: ImAppDatabaseHelper) {
         }
     }
 
-    internal fun upsertInTransaction(db: SQLiteDatabase, conversation: Conversation) {
+    internal fun upsertInTransaction(db: SQLiteDatabase, conversation: Conversation, incrementUnread: Boolean = false) {
+        val previous = db.rawQuery(
+            "SELECT * FROM ${ImAppDatabaseHelper.TABLE_CONVERSATION} WHERE ownerId = ? AND sessionId = ? LIMIT 1",
+            arrayOf(conversation.ownerId, conversation.sessionId)
+        ).use { if (it.moveToFirst()) it.toConversation() else null }
+        val latest = if (previous != null && previous.lastMessageTime > conversation.lastMessageTime) previous else conversation
         val values = ContentValues().apply {
-            put("sessionId", conversation.sessionId)
-            put("sessionType", conversation.sessionType)
-            put("ownerId", conversation.ownerId)
-            put("peerId", conversation.peerId)
-            put("updateTime", conversation.updateTime)
+            put("sessionId", latest.sessionId)
+            put("sessionType", latest.sessionType)
+            put("ownerId", latest.ownerId)
+            put("peerId", latest.peerId)
+            put("lastMessageId", latest.lastMessageId)
+            put("lastMessageType", latest.lastMessageType)
+            put("lastMessagePreview", latest.lastMessagePreview)
+            put("lastMessageTime", latest.lastMessageTime)
+            put("unreadCount", (previous?.unreadCount ?: 0) + if (incrementUnread) 1 else 0)
+            put("updateTime", maxOf(previous?.updateTime ?: 0L, conversation.updateTime))
         }
         db.insertWithOnConflict(
             ImAppDatabaseHelper.TABLE_CONVERSATION,
@@ -47,12 +70,29 @@ class ConversationDao(private val dbHelper: ImAppDatabaseHelper) {
         )
     }
 
+    suspend fun markRead(ownerId: String, sessionId: String) = withContext(Dispatchers.IO) {
+        dbHelper.writableDatabase.update(
+            ImAppDatabaseHelper.TABLE_CONVERSATION,
+            ContentValues().apply { put("unreadCount", 0) },
+            "ownerId = ? AND sessionId = ?",
+            arrayOf(ownerId, sessionId)
+        )
+        notifyChanged()
+    }
+
+    internal fun notifyChanged() { changes.value = changes.value + 1 }
+
     private fun android.database.Cursor.toConversation() = Conversation(
         id = getLong(getColumnIndexOrThrow("id")),
         sessionId = getString(getColumnIndexOrThrow("sessionId")),
         sessionType = getInt(getColumnIndexOrThrow("sessionType")),
         ownerId = getString(getColumnIndexOrThrow("ownerId")),
         peerId = getString(getColumnIndexOrThrow("peerId")),
+        lastMessageId = getString(getColumnIndexOrThrow("lastMessageId")),
+        lastMessageType = getInt(getColumnIndexOrThrow("lastMessageType")),
+        lastMessagePreview = getString(getColumnIndexOrThrow("lastMessagePreview")),
+        lastMessageTime = getLong(getColumnIndexOrThrow("lastMessageTime")),
+        unreadCount = getInt(getColumnIndexOrThrow("unreadCount")),
         updateTime = getLong(getColumnIndexOrThrow("updateTime"))
     )
 }

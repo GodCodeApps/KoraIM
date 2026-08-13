@@ -20,14 +20,31 @@ class MsgVideoViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
 
     override fun bindViewHolder(view: View, message: IMMessage) {
         val cover = view.findViewById<ImageView>(R.id.iv_video_cover)
+        val container = view.findViewById<View>(R.id.video_container)
         val duration = view.findViewById<TextView>(R.id.tv_video_duration)
         val source = attachment.remoteUrl.ifBlank { attachment.localPath }
         val coverSource = attachment.remoteCoverUrl.ifBlank {
             attachment.localCoverPath.ifBlank { source }
         }
-        Glide.with(cover).load(coverSource).centerCrop().into(cover)
+        val density = view.resources.displayMetrics.density
+        val maxWidth = (240 * density).toInt()
+        val maxHeight = (240 * density).toInt()
+        val minHeight = (140 * density).toInt()
+        val ratio = if (attachment.width > 0 && attachment.height > 0) {
+            (attachment.width.toFloat() / attachment.height).coerceIn(0.6f, 1.8f)
+        } else 4f / 3f
+        val params = container.layoutParams
+        params.width = maxWidth
+        params.height = (maxWidth / ratio).toInt().coerceIn(minHeight, maxHeight)
+        container.layoutParams = params
+        Glide.with(cover)
+            .load(coverSource)
+            .placeholder(R.drawable.bg_media_placeholder)
+            .error(R.drawable.media_error_placeholder)
+            .centerCrop()
+            .into(cover)
         duration.text = formatDuration(attachment.duration)
-        view.findViewById<View>(R.id.video_container).setOnClickListener {
+        container.setOnClickListener {
             if (source.isBlank()) return@setOnClickListener
             val dialog = Dialog(view.context, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
             val videoView = VideoView(view.context)

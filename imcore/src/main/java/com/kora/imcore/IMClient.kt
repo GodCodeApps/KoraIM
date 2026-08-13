@@ -84,6 +84,16 @@ object IMClient {
         return conversationDao.getAll(IMRuntime.ownerId)
     }
 
+    fun observeConversations(): Flow<List<Conversation>> {
+        ensureInitialized()
+        return conversationDao.observeAll(IMRuntime.ownerId)
+    }
+
+    suspend fun markConversationRead(sessionId: String) {
+        ensureInitialized()
+        if (sessionId.isNotBlank()) conversationDao.markRead(IMRuntime.ownerId, sessionId)
+    }
+
     fun observeLastMessage(sessionId: String): Flow<Message> {
         ensureInitialized()
         return messageRepository.observeLastMessage(sessionId)

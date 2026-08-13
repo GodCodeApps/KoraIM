@@ -87,6 +87,16 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
             }
         }
 
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                IMClient.incomingMessages.collect { message ->
+                    val belongsHere = message.sessionId == currentSessionId ||
+                        (currentSessionId.isBlank() && message.getIMSessionType() == SessionType.P2P && message.senderId == peerId)
+                    if (belongsHere) IMClient.markConversationRead(message.sessionId)
+                }
+            }
+        }
+
     }
 
     override fun getAppActivity(): FragmentActivity {

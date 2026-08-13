@@ -8,6 +8,6 @@
         android:id="@+id/iv_image"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:gravity="center"
+        android:background="@drawable/bg_media_placeholder"
         android:scaleType="centerCrop" />
 </LinearLayout>

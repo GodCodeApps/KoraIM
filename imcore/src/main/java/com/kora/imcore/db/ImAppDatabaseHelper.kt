@@ -8,7 +8,7 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
 
     companion object {
         const val DATABASE_NAME = "im_app_database.db"
-        const val DATABASE_VERSION = 5
+        const val DATABASE_VERSION = 6
 
         const val TABLE_MESSAGE = "message"
         const val TABLE_USER_INFO = "user_info"
@@ -72,6 +72,11 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
                 sessionType INTEGER NOT NULL,
                 ownerId TEXT NOT NULL,
                 peerId TEXT NOT NULL DEFAULT '',
+                lastMessageId TEXT NOT NULL DEFAULT '',
+                lastMessageType INTEGER NOT NULL DEFAULT 0,
+                lastMessagePreview TEXT NOT NULL DEFAULT '',
+                lastMessageTime INTEGER NOT NULL DEFAULT 0,
+                unreadCount INTEGER NOT NULL DEFAULT 0,
                 updateTime INTEGER NOT NULL,
                 UNIQUE(ownerId, sessionId),
                 UNIQUE(ownerId, sessionType, peerId)

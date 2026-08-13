@@ -21,7 +21,7 @@
             android:layout_width="30dp"
             android:layout_height="30dp"
             android:layout_marginBottom="4dp"
-            android:src="@drawable/ic_chat_voice_toggle"
+            android:src="@drawable/ic_voice"
             android:contentDescription="语音输入" />
 
         <FrameLayout
@@ -45,7 +45,6 @@
                 android:paddingEnd="12dp"
                 android:paddingTop="8dp"
                 android:paddingBottom="8dp"
-                android:drawableEnd="@drawable/ic_chat_mic_inner"
                 android:drawablePadding="8dp"
                 android:textSize="16sp" />
 

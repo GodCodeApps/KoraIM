@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import com.kora.imcore.netty.SyncEvent
+import com.kora.imcore.constant.MsgDirection
+import com.kora.imcore.constant.MsgType
+import org.json.JSONObject
 
 /**
  * Copyright 2026 GodCodeApps
@@ -22,6 +25,25 @@ class MessageDao(
     private val dbHelper: ImAppDatabaseHelper,
     private val conversationDao: ConversationDao = ConversationDao(dbHelper)
 ) {
+
+    private fun Message.toConversation(ownerId: String) = Conversation(
+        sessionId = sessionId,
+        sessionType = sessionType,
+        ownerId = ownerId,
+        peerId = if (senderId == ownerId) receiverId else senderId,
+        lastMessageId = messageId,
+        lastMessageType = type,
+        lastMessagePreview = when (type) {
+            MsgType.TEXT -> runCatching { JSONObject(attachment).optString("content") }.getOrDefault("")
+            MsgType.IMAGE -> "[图片]"
+            MsgType.VIDEO -> "[视频]"
+            MsgType.VOICE -> "[语音]"
+            MsgType.TIP -> "[提示消息]"
+            else -> "[消息]"
+        },
+        lastMessageTime = time,
+        updateTime = time
+    )
 
     private val _tableChangeFlow = MutableSharedFlow<Unit>(
         replay = 1,
@@ -120,30 +142,23 @@ class MessageDao(
         val db = dbHelper.writableDatabase
         db.beginTransaction()
         try {
+            val existed = db.rawQuery("SELECT 1 FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE messageId = ?", arrayOf(message.messageId)).use { it.moveToFirst() }
+            db.insertWithOnConflict(
+                ImAppDatabaseHelper.TABLE_MESSAGE,
+                null,
+                messageToContentValues(message),
+                SQLiteDatabase.CONFLICT_REPLACE
+            )
             conversationDao.upsertInTransaction(
                 db,
-                Conversation(
-                    sessionId = message.sessionId,
-                    sessionType = message.sessionType,
-                    ownerId = ownerId,
-                    peerId = if (message.senderId == ownerId) message.receiverId else message.senderId,
-                    updateTime = System.currentTimeMillis()
-                )
-            )
-            val values = ContentValues().apply {
-                put(ImAppDatabaseHelper.COLUMN_SESSION_ID, message.sessionId)
-                put(ImAppDatabaseHelper.COLUMN_STATUS, message.status)
-            }
-            db.update(
-                ImAppDatabaseHelper.TABLE_MESSAGE,
-                values,
-                "messageId = ?",
-                arrayOf(message.messageId)
+                message.toConversation(ownerId),
+                incrementUnread = !existed && message.direct == MsgDirection.IN
             )
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
         }
+        conversationDao.notifyChanged()
         notifyChange()
     }
 
@@ -160,22 +175,13 @@ class MessageDao(
                 } else {
                     com.kora.imcore.constant.MsgDirection.IN
                 }
-                db.insertWithOnConflict(
+                val inserted = db.insertWithOnConflict(
                     ImAppDatabaseHelper.TABLE_MESSAGE,
                     null,
                     messageToContentValues(message),
                     SQLiteDatabase.CONFLICT_IGNORE
                 )
-                conversationDao.upsertInTransaction(
-                    db,
-                    Conversation(
-                        sessionId = message.sessionId,
-                        sessionType = message.sessionType,
-                        ownerId = ownerId,
-                        peerId = if (message.senderId == ownerId) message.receiverId else message.senderId,
-                        updateTime = message.time
-                    )
-                )
+                conversationDao.upsertInTransaction(db, message.toConversation(ownerId), inserted != -1L && message.direct == MsgDirection.IN)
             }
             db.insertWithOnConflict(
                 ImAppDatabaseHelper.TABLE_SYNC_STATE,
@@ -191,7 +197,10 @@ class MessageDao(
         } finally {
             db.endTransaction()
         }
-        notifyChange()
+        if (events.isNotEmpty()) {
+            conversationDao.notifyChanged()
+            notifyChange()
+        }
     }
 
     suspend fun getMessageBySessionId(sessionId: String, page: Int): List<Message> = withContext(Dispatchers.IO) {

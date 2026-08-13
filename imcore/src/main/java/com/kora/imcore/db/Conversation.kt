@@ -8,5 +8,10 @@ data class Conversation(
     var sessionType: Int = SessionType.None,
     var ownerId: String = "",
     var peerId: String = "",
+    var lastMessageId: String = "",
+    var lastMessageType: Int = 0,
+    var lastMessagePreview: String = "",
+    var lastMessageTime: Long = 0L,
+    var unreadCount: Int = 0,
     var updateTime: Long = 0L
 )

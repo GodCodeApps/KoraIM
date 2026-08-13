@@ -17,8 +17,8 @@ internal object IMRuntime {
 
     fun incoming(message: Message) {
         scope.launch {
-            messages.upsert(message)
             if (message.sessionId.isNotBlank()) messages.confirm(message, ownerId)
+            else messages.upsert(message)
             IMEventHub.emitIncoming(message)
         }
     }

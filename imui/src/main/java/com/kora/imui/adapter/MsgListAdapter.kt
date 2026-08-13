@@ -48,6 +48,18 @@ class MsgListAdapter : RecyclerView.Adapter<MsgViewHolderBase>() {
         notifyDataSetChanged()
     }
 
+    fun replaceAll(list: List<IMMessage>) {
+        mMsgList.clear()
+        mMsgList.addAll(list)
+        notifyDataSetChanged()
+    }
+
+    fun getMessageId(position: Int): String? =
+        mMsgList.getOrNull(position)?.getMsgId()
+
+    fun indexOfMessage(messageId: String): Int =
+        mMsgList.indexOfFirst { it.getMsgId() == messageId }
+
     fun notify(message: IMMessage) {
         mMsgList.forEachIndexed { index, imMessage ->
             if (imMessage.getMsgId() == message.getMsgId()) {
