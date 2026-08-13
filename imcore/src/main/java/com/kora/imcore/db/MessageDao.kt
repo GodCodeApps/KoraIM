@@ -17,7 +17,10 @@ import kotlinx.coroutines.withContext
  * @Date: 2026/07/21:18:07
  * @Description: SQLite implementation of MessageDao
  */
-class MessageDao(private val dbHelper: ImAppDatabaseHelper) {
+class MessageDao(
+    private val dbHelper: ImAppDatabaseHelper,
+    private val conversationDao: ConversationDao = ConversationDao(dbHelper)
+) {
 
     private val _tableChangeFlow = MutableSharedFlow<Unit>(
         replay = 1,
@@ -45,7 +48,8 @@ class MessageDao(private val dbHelper: ImAppDatabaseHelper) {
             val idxTime = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_TIME)
             val idxAttachment = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_ATTACHMENT)
             val idxExtra = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_EXTRA)
-            val idxAccount = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_ACCOUNT)
+            val idxSenderId = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_SENDER_ID)
+            val idxReceiverId = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_RECEIVER_ID)
 
             do {
                 val msg = Message()
@@ -59,7 +63,8 @@ class MessageDao(private val dbHelper: ImAppDatabaseHelper) {
                 msg.time = cursor.getLong(idxTime)
                 msg.attachment = cursor.getString(idxAttachment)
                 msg.extra = cursor.getString(idxExtra)
-                msg.account = cursor.getString(idxAccount)
+                msg.senderId = cursor.getString(idxSenderId)
+                msg.receiverId = cursor.getString(idxReceiverId)
                 list.add(msg)
             } while (cursor.moveToNext())
         }
@@ -81,7 +86,8 @@ class MessageDao(private val dbHelper: ImAppDatabaseHelper) {
         cv.put(ImAppDatabaseHelper.COLUMN_TIME, msg.time)
         cv.put(ImAppDatabaseHelper.COLUMN_ATTACHMENT, msg.attachment)
         cv.put(ImAppDatabaseHelper.COLUMN_EXTRA, msg.extra)
-        cv.put(ImAppDatabaseHelper.COLUMN_ACCOUNT, msg.account)
+        cv.put(ImAppDatabaseHelper.COLUMN_SENDER_ID, msg.senderId)
+        cv.put(ImAppDatabaseHelper.COLUMN_RECEIVER_ID, msg.receiverId)
         return cv
     }
 
@@ -94,6 +100,50 @@ class MessageDao(private val dbHelper: ImAppDatabaseHelper) {
             )
             parseMessageList(cursor)
         }
+    }
+
+    fun getP2PMessages(ownerId: String, peerId: String): Flow<List<Message>> = _tableChangeFlow.map {
+        val cursor = dbHelper.readableDatabase.rawQuery(
+            "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE sessionType = ? AND " +
+                "((senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?)) " +
+                "ORDER BY id DESC",
+            arrayOf(
+                com.kora.imcore.constant.SessionType.P2P.toString(),
+                ownerId, peerId, peerId, ownerId
+            )
+        )
+        parseMessageList(cursor)
+    }
+
+    suspend fun confirmMessage(message: Message, ownerId: String) = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            conversationDao.upsertInTransaction(
+                db,
+                Conversation(
+                    sessionId = message.sessionId,
+                    sessionType = message.sessionType,
+                    ownerId = ownerId,
+                    peerId = if (message.senderId == ownerId) message.receiverId else message.senderId,
+                    updateTime = System.currentTimeMillis()
+                )
+            )
+            val values = ContentValues().apply {
+                put(ImAppDatabaseHelper.COLUMN_SESSION_ID, message.sessionId)
+                put(ImAppDatabaseHelper.COLUMN_STATUS, message.status)
+            }
+            db.update(
+                ImAppDatabaseHelper.TABLE_MESSAGE,
+                values,
+                "messageId = ?",
+                arrayOf(message.messageId)
+            )
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        notifyChange()
     }
 
     suspend fun getMessageBySessionId(sessionId: String, page: Int): List<Message> = withContext(Dispatchers.IO) {

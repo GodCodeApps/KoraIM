@@ -108,7 +108,7 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
         }
         
         // 统一处理头像加载与默认头像兜底
-        val account = mMessage?.getFromAccount()
+        val account = mMessage?.senderId
         val defaultAvatarRes = R.drawable.ic_default_avatar
         val targetAvatarView = if (isReceivedMsg()) leftAvatar else rightAvatar
         
@@ -151,23 +151,23 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
         }
         leftAvatar?.setOnClickListener {
             ImUIKitImpl.getSessionListener()?.getAvatarClickListener()?.invoke(
-                mMessage?.getFromAccount()
+                mMessage?.senderId
             )
         }
         leftAvatar?.setOnLongClickListener {
             ImUIKitImpl.getSessionListener()?.getAvatarLongClickListener()?.invoke(
-                mMessage?.getFromAccount()
+                mMessage?.senderId
             )
             true
         }
         rightAvatar?.setOnClickListener {
             ImUIKitImpl.getSessionListener()?.getAvatarClickListener()?.invoke(
-                mMessage?.getFromAccount()
+                mMessage?.senderId
             )
         }
         rightAvatar?.setOnLongClickListener {
             ImUIKitImpl.getSessionListener()?.getAvatarLongClickListener()?.invoke(
-                mMessage?.getFromAccount()
+                mMessage?.senderId
             )
             true
         }

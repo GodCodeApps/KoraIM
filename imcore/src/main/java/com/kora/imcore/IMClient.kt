@@ -5,6 +5,8 @@ import com.kora.imcore.connection.ConnectionManager
 import com.kora.imcore.db.ImAppDatabaseHelper
 import com.kora.imcore.db.Message
 import com.kora.imcore.db.MessageDao
+import com.kora.imcore.db.Conversation
+import com.kora.imcore.db.ConversationDao
 import com.kora.imcore.db.UserDao
 import com.kora.imcore.db.UserInfo
 import com.kora.imcore.event.ConnectionState
@@ -26,6 +28,7 @@ object IMClient {
     private var connectionManager: ConnectionManager? = null
     private lateinit var messageRepository: MessageRepository
     private lateinit var userRepository: UserRepository
+    private lateinit var conversationDao: ConversationDao
 
     var userInfoProvider: IMUserInfoProvider?
         get() = if (::userRepository.isInitialized) userRepository.provider else null
@@ -43,9 +46,11 @@ object IMClient {
         release()
         val appContext = context.applicationContext
         val database = ImAppDatabaseHelper(appContext)
-        messageRepository = MessageRepository(MessageDao(database))
+        conversationDao = ConversationDao(database)
+        messageRepository = MessageRepository(MessageDao(database, conversationDao))
         userRepository = UserRepository(UserDao(database), IMRuntime.scope)
         IMRuntime.messages = messageRepository
+        IMRuntime.ownerId = account
         ImSdkImpl.init()
         connectionManager = ConnectionManager(appContext).also { it.connect(host, port, account) }
     }
@@ -59,6 +64,21 @@ object IMClient {
     fun observeMessages(sessionId: String): Flow<List<Message>> {
         ensureInitialized()
         return messageRepository.observeSession(sessionId)
+    }
+
+    fun observeP2PMessages(peerId: String): Flow<List<Message>> {
+        ensureInitialized()
+        return messageRepository.observeP2P(IMRuntime.ownerId, peerId)
+    }
+
+    suspend fun getP2PConversation(peerId: String): Conversation? {
+        ensureInitialized()
+        return conversationDao.findP2P(IMRuntime.ownerId, peerId)
+    }
+
+    suspend fun getConversations(): List<Conversation> {
+        ensureInitialized()
+        return conversationDao.getAll(IMRuntime.ownerId)
     }
 
     fun observeLastMessage(sessionId: String): Flow<Message> {

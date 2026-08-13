@@ -7,7 +7,9 @@ internal data class WireEnvelope(
     val type: String,
     val messageId: String = "",
     val payload: Message? = null,
-    val account: String? = null
+    val account: String? = null,
+    val sessionId: String? = null,
+    val success: Boolean? = null
 ) {
     fun encode(gson: Gson): String = gson.toJson(this) + "\n"
 

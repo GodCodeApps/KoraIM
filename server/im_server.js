@@ -1,7 +1,24 @@
 // Copyright 2026 GodCodeApps. Licensed under the Apache License, Version 2.0.
 const net = require('net');
+const crypto = require('crypto');
 const PORT = Number(process.env.PORT || 8090);
 const clients = new Map();
+const p2pSessions = new Map();
+
+function p2pKey(first, second) {
+    return [first, second].sort().join(':');
+}
+
+function findOrCreateP2PSession(first, second) {
+    const key = p2pKey(first, second);
+    let sessionId = p2pSessions.get(key);
+    if (!sessionId) {
+        sessionId = `p2p_${crypto.randomUUID()}`;
+        p2pSessions.set(key, sessionId);
+        console.log(`[+] Created P2P session ${sessionId} for ${key}`);
+    }
+    return sessionId;
+}
 
 function writeFrame(socket, frame) {
     socket.write(`${JSON.stringify(frame)}\n`);
@@ -48,23 +65,28 @@ function handleFrame(socket, line) {
         }
         if (!socket.account) throw new Error('Login required');
 
-        const recipient = clients.get(envelope.payload.sessionId);
+        const recipientId = String(envelope.payload.receiverId || '').trim();
+        if (!recipientId || recipientId === socket.account) throw new Error('Invalid receiverId');
+        const recipient = clients.get(recipientId);
         if (!recipient || recipient.destroyed) {
-            console.log(`[>] ${socket.account} -> ${envelope.payload.sessionId} (offline)`);
+            console.log(`[>] ${socket.account} -> ${recipientId} (offline)`);
             return;
         }
+
+        const sessionId = findOrCreateP2PSession(socket.account, recipientId);
 
         const incoming = {
             ...envelope.payload,
             id: 0,
-            sessionId: socket.account,
-            account: socket.account,
+            sessionId,
+            senderId: socket.account,
+            receiverId: recipientId,
             direct: 1,
             status: 1,
             time: Date.now()
         };
         writeFrame(recipient, { type: 'message', messageId: incoming.messageId, payload: incoming });
-        writeFrame(socket, { type: 'ack', messageId: envelope.messageId });
+        writeFrame(socket, { type: 'ack', messageId: envelope.messageId, success: true, sessionId });
         console.log(`[>] ${socket.account} -> ${recipient.account}`);
     } catch (error) {
         console.error(`[!] Invalid frame: ${error.message}`);

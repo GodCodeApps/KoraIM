@@ -112,9 +112,10 @@ class IMService : Service() {
             outgoingMessages.remove(message)
             PendingAckRegistry.fail(message.messageId)
         }
-        PendingAckRegistry.register(message.messageId) { acknowledged ->
+        PendingAckRegistry.register(message.messageId) { result ->
             mainHandler.removeCallbacks(timeout)
-            message.status = if (acknowledged) MsgStatus.SUCCESS else MsgStatus.FAIL
+            if (result.success && !result.sessionId.isNullOrBlank()) message.sessionId = result.sessionId
+            message.status = if (result.success) MsgStatus.SUCCESS else MsgStatus.FAIL
             IMRuntime.updated(message)
         }
         mainHandler.postDelayed(timeout, ACK_TIMEOUT_MS)

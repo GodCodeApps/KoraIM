@@ -11,11 +11,13 @@ import java.io.Serializable
  * @Description:
  */
 interface IMMessage : Serializable {
+    val senderId: String
+    val receiverId: String
+
     fun getMsgId(): String
     fun getIMSessionType(): Int
     fun getIMSessionId(): String
     fun getMsgType(): Int
-    fun getFromAccount(): String
     fun getMsgDirection(): Int
     fun getMsgStatus(): Int
     fun getMsgTime(): Long

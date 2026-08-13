@@ -28,13 +28,15 @@ class Message : IMMessage {
     var time: Long = 0
     var attachment: String = ""
     var extra: String = ""
-    var account: String = ""
+    override var senderId: String = ""
+    override var receiverId: String = ""
 
     constructor(
         messageId: String = UUID.randomUUID().toString(),
         sessionType: Int,
         sessionId: String,
-        account: String = "",
+        senderId: String = "",
+        receiverId: String = "",
         type: Int,
         direct: Int,
         status: Int,
@@ -45,7 +47,8 @@ class Message : IMMessage {
         this.messageId = messageId
         this.sessionType = sessionType
         this.sessionId = sessionId
-        this.account = account
+        this.senderId = senderId
+        this.receiverId = receiverId
         this.type = type
         this.direct = direct
         this.status = status
@@ -71,11 +74,6 @@ class Message : IMMessage {
     override fun getMsgType(): Int {
         return type
     }
-
-    override fun getFromAccount(): String {
-        return account
-    }
-
 
     override fun getMsgDirection(): Int {
         return direct

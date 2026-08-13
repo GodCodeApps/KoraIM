@@ -8,10 +8,11 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
 
     companion object {
         const val DATABASE_NAME = "im_app_database.db"
-        const val DATABASE_VERSION = 4
+        const val DATABASE_VERSION = 5
 
         const val TABLE_MESSAGE = "message"
         const val TABLE_USER_INFO = "user_info"
+        const val TABLE_CONVERSATION = "conversation"
         
         // Table columns
         const val COLUMN_ID = "id"
@@ -24,7 +25,8 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
         const val COLUMN_TIME = "time"
         const val COLUMN_ATTACHMENT = "attachment"
         const val COLUMN_EXTRA = "extra"
-        const val COLUMN_ACCOUNT = "account"
+        const val COLUMN_SENDER_ID = "senderId"
+        const val COLUMN_RECEIVER_ID = "receiverId"
         
         // User_info columns (some overlap like account, nickname, avatar)
         const val COLUMN_USER_ACCOUNT = "account"
@@ -46,7 +48,8 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
                 $COLUMN_TIME INTEGER NOT NULL,
                 $COLUMN_ATTACHMENT TEXT NOT NULL,
                 $COLUMN_EXTRA TEXT NOT NULL,
-                $COLUMN_ACCOUNT TEXT NOT NULL
+                $COLUMN_SENDER_ID TEXT NOT NULL,
+                $COLUMN_RECEIVER_ID TEXT NOT NULL
             )
         """.trimIndent()
         
@@ -61,23 +64,21 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
         
         db.execSQL(createMessageTable)
         db.execSQL(createUserTable)
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS $TABLE_CONVERSATION (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sessionId TEXT NOT NULL UNIQUE,
+                sessionType INTEGER NOT NULL,
+                ownerId TEXT NOT NULL,
+                peerId TEXT NOT NULL DEFAULT '',
+                updateTime INTEGER NOT NULL,
+                UNIQUE(ownerId, sessionType, peerId)
+            )""".trimIndent()
+        )
         createIndexes(db)
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion < 4) {
-            // Keep the newest local row when old databases contain duplicated message ids.
-            db.execSQL(
-                "DELETE FROM $TABLE_MESSAGE WHERE $COLUMN_ID NOT IN " +
-                    "(SELECT MAX($COLUMN_ID) FROM $TABLE_MESSAGE GROUP BY $COLUMN_MESSAGE_ID)"
-            )
-            db.execSQL(
-                "CREATE UNIQUE INDEX IF NOT EXISTS index_message_messageId " +
-                    "ON $TABLE_MESSAGE($COLUMN_MESSAGE_ID)"
-            )
-            createIndexes(db)
-        }
-    }
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
 
     private fun createIndexes(db: SQLiteDatabase) {
         db.execSQL(

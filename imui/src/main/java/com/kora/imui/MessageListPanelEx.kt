@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 class MessageListPanelEx(
     var context: Fragment,
     var sessionId: String,
+    var peerId: String,
     var rootView: View,
     var remote: Boolean
 ) {
@@ -85,7 +86,12 @@ class MessageListPanelEx(
     private fun observeMessages() {
         context.viewLifecycleOwner.lifecycleScope.launch {
             context.viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                IMClient.observeMessages(sessionId).collect {
+                val messages = if (peerId.isNotBlank()) {
+                    IMClient.observeP2PMessages(peerId)
+                } else {
+                    IMClient.observeMessages(sessionId)
+                }
+                messages.collect {
                     Log.e("loadMessageHistory", it.toString())
                     mMessageAdapter?.clear()
                     mMessageAdapter?.addList(it)

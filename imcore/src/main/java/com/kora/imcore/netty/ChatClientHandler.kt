@@ -17,7 +17,10 @@ internal class ChatClientHandler(
         try {
             val envelope = gson.fromJson(frame, WireEnvelope::class.java)
             when (envelope.type) {
-                WireEnvelope.TYPE_ACK -> PendingAckRegistry.acknowledge(envelope.messageId)
+                WireEnvelope.TYPE_ACK -> {
+                    if (envelope.success == false) PendingAckRegistry.fail(envelope.messageId)
+                    else PendingAckRegistry.acknowledge(envelope.messageId, envelope.sessionId)
+                }
                 WireEnvelope.TYPE_MESSAGE -> envelope.payload?.let { message ->
                     ctx.writeAndFlush(gson.toJson(WireEnvelope(WireEnvelope.TYPE_ACK, envelope.messageId)) + "\n")
                     deliverMessage(message)

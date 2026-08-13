@@ -11,14 +11,24 @@ import kotlinx.coroutines.launch
 internal object IMRuntime {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     lateinit var messages: MessageRepository
+    var ownerId: String = ""
 
     fun incoming(message: Message) {
-        scope.launch { messages.upsert(message) }
-        IMEventHub.emitIncoming(message)
+        scope.launch {
+            messages.upsert(message)
+            if (message.sessionId.isNotBlank()) messages.confirm(message, ownerId)
+            IMEventHub.emitIncoming(message)
+        }
     }
 
     fun updated(message: Message) {
-        scope.launch { messages.upsert(message) }
-        IMEventHub.emitUpdate(message)
+        scope.launch {
+            if (message.status == com.kora.imcore.constant.MsgStatus.SUCCESS && message.sessionId.isNotBlank()) {
+                messages.confirm(message, ownerId)
+            } else {
+                messages.upsert(message)
+            }
+            IMEventHub.emitUpdate(message)
+        }
     }
 }

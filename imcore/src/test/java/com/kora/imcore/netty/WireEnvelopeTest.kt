@@ -19,6 +19,8 @@ class WireEnvelopeTest {
             messageId = "message-1",
             sessionType = SessionType.P2P,
             sessionId = "session-1",
+            senderId = "sender-1",
+            receiverId = "receiver-1",
             type = MsgType.TEXT,
             direct = MsgDirection.OUT,
             status = MsgStatus.SENDING,

@@ -17,6 +17,8 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 
 /**
  * Copyright 2026 GodCodeApps
@@ -26,8 +28,11 @@ import kotlinx.coroutines.launch
  */
 abstract class IMessageFragment : Fragment(), ModuleProxy {
     val sessionType get() = arguments?.getInt("session_type") ?: SessionType.None
-    val sessionId get() = arguments?.getString("session_id") ?: ""
+    private var currentSessionId = ""
+    val sessionId get() = currentSessionId
+    val peerId get() = arguments?.getString("peer_id") ?: ""
     var messageListPanelEx: MessageListPanelEx? = null
+    private var inputPanel: InputPanel? = null
 
     /**
      * 自定义底部输入框样式
@@ -43,28 +48,44 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        currentSessionId = arguments?.getString("session_id").orEmpty()
         
         // 绑定导航栏
         view.findViewById<ImageView>(R.id.iv_back)?.setOnClickListener {
             activity?.onBackPressed()
         }
         val tvTitle = view.findViewById<TextView>(R.id.tv_title)
-        tvTitle?.text = sessionId
+        tvTitle?.text = peerId.ifBlank { sessionId }
         
         // 尝试从 Provider 获取真实的用户名
         viewLifecycleOwner.lifecycleScope.launch {
-            val userInfo = IMClient.getUserInfo(sessionId)
+            val userInfo = IMClient.getUserInfo(peerId.ifBlank { sessionId })
             if (userInfo != null && !userInfo.nickname.isNullOrEmpty()) {
                 tvTitle?.text = userInfo.nickname
             }
         }
         
-        messageListPanelEx = MessageListPanelEx(this, sessionId, view, true)
-        InputPanel.Builder()
+        messageListPanelEx = MessageListPanelEx(this, sessionId, peerId, view, true)
+        inputPanel = InputPanel.Builder()
             .setProxy(this)
             .setSessionId(sessionId)
+            .setPeerId(peerId)
             .setSessionType(sessionType)
             .build(this,view, messageListPanelEx = messageListPanelEx!!)
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                IMClient.messageUpdates.collect { message ->
+                    if (currentSessionId.isBlank() && message.sessionId.isNotBlank() &&
+                        message.getIMSessionType() == SessionType.P2P &&
+                        (message.senderId == peerId || message.receiverId == peerId)
+                    ) {
+                        currentSessionId = message.sessionId
+                        inputPanel?.updateSessionId(currentSessionId)
+                    }
+                }
+            }
+        }
 
     }
 

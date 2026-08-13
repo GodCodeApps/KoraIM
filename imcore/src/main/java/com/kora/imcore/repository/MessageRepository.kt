@@ -10,10 +10,14 @@ internal class MessageRepository(private val dao: MessageDao) {
     fun observeSession(sessionId: String): Flow<List<Message>> =
         dao.getMessageBySessionId(sessionId).flowOn(Dispatchers.IO)
 
+    fun observeP2P(ownerId: String, peerId: String): Flow<List<Message>> =
+        dao.getP2PMessages(ownerId, peerId).flowOn(Dispatchers.IO)
+
     fun observeLastMessage(sessionId: String): Flow<Message> =
         dao.getLaseMessageBySessionId(sessionId).flowOn(Dispatchers.IO)
 
     suspend fun page(sessionId: String, page: Int): List<Message> = dao.getMessageBySessionId(sessionId, page)
     suspend fun upsert(message: Message) = dao.insertMessage(message)
     suspend fun upsertAll(messages: List<Message>) = dao.insertMessageList(messages)
+    suspend fun confirm(message: Message, ownerId: String) = dao.confirmMessage(message, ownerId)
 }

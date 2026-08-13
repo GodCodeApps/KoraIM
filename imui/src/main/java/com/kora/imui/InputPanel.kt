@@ -34,11 +34,15 @@ class InputPanel(
     var fragment: Fragment,
     var proxy: ModuleProxy?,
     var sessionId: String,
+    var peerId: String,
     var sessionType: Int,
     var actions: List<BaseInputAction>?,
     var rootView: View,
     var messageListPanelEx: MessageListPanelEx
 ) {
+    fun updateSessionId(value: String) {
+        sessionId = value
+    }
     private val chatInputView = rootView.findViewById<ChatInputView>(R.id.chat_input_view)
 
     private var onMoreActionClickListener: ((Int) -> Unit)? = null
@@ -50,6 +54,7 @@ class InputPanel(
         private var mProxy: ModuleProxy? = null
         private var mActions: List<BaseInputAction>? = null
         private var mSessionId: String = ""
+        private var mPeerId: String = ""
         private var mSessionType: Int = SessionType.None
         fun setProxy(proxy: ModuleProxy): Builder {
             this.mProxy = proxy
@@ -66,6 +71,11 @@ class InputPanel(
             return this
         }
 
+        fun setPeerId(peerId: String): Builder {
+            this.mPeerId = peerId
+            return this
+        }
+
         fun setActions(actions: List<BaseInputAction>): Builder {
             this.mActions = actions
             return this
@@ -73,7 +83,7 @@ class InputPanel(
 
         fun build(fragment: Fragment, rootView: View, messageListPanelEx: MessageListPanelEx): InputPanel {
             return InputPanel(
-                fragment,mProxy, mSessionId, mSessionType, mActions, rootView, messageListPanelEx
+                fragment,mProxy, mSessionId, mPeerId, mSessionType, mActions, rootView, messageListPanelEx
             )
         }
     }
@@ -109,7 +119,12 @@ class InputPanel(
                     return
                 }
                 // 创建一个新的 MessageItem
-                val createTextMessage = createTextMessage(sessionId, sessionType, msg = message)
+                val createTextMessage = createTextMessage(
+                    sessionId,
+                    sessionType,
+                    receiverId = peerId.ifBlank { sessionId },
+                    msg = message
+                )
                 // 添加到适配器并滚动到底部
 //                messageListPanelEx.addItemMsg(createTextMessage)
                 proxy?.sendMessage(createTextMessage)
@@ -134,6 +149,7 @@ class InputPanel(
                                     val msg = createImageMessage(
                                         sessionId = sessionId,
                                         sessionType = sessionType,
+                                        receiverId = peerId.ifBlank { sessionId },
                                         localPath = path,
                                         mWidth = media.width,
                                         mHeight = media.height
@@ -204,7 +220,8 @@ class InputPanel(
                     val msg = Message(
                         sessionType = sessionType,
                         sessionId = sessionId,
-                        account = ImSdkImpl.getAccount() ?: "",
+                        senderId = ImSdkImpl.getAccount() ?: "",
+                        receiverId = peerId.ifBlank { sessionId },
                         type = voiceAttach.getMsgType(),
                         direct = MsgDirection.OUT,
                         status = MsgStatus.SENDING,

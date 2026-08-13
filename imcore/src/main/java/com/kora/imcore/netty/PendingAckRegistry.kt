@@ -3,18 +3,20 @@ package com.kora.imcore.netty
 import java.util.concurrent.ConcurrentHashMap
 
 internal object PendingAckRegistry {
-    private val callbacks = ConcurrentHashMap<String, (Boolean) -> Unit>()
+    data class Result(val success: Boolean, val sessionId: String? = null)
 
-    fun register(messageId: String, callback: (Boolean) -> Unit) {
-        callbacks.put(messageId, callback)?.invoke(false)
+    private val callbacks = ConcurrentHashMap<String, (Result) -> Unit>()
+
+    fun register(messageId: String, callback: (Result) -> Unit) {
+        callbacks.put(messageId, callback)?.invoke(Result(false))
     }
 
-    fun acknowledge(messageId: String) {
-        callbacks.remove(messageId)?.invoke(true)
+    fun acknowledge(messageId: String, sessionId: String?) {
+        callbacks.remove(messageId)?.invoke(Result(true, sessionId))
     }
 
     fun fail(messageId: String) {
-        callbacks.remove(messageId)?.invoke(false)
+        callbacks.remove(messageId)?.invoke(Result(false))
     }
 
     fun failAll() {

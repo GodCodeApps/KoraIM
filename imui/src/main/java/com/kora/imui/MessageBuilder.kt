@@ -23,6 +23,7 @@ object MessageBuilder {
         @MsgType msgType: Int = MsgType.TEXT,
         @MsgDirection msgDirect: Int = MsgDirection.OUT,
         @MsgStatus msgStatus: Int = MsgStatus.SENDING,
+        receiverId: String = sessionId,
         msg: String = ""
     ): IMMessage {
         return Message(
@@ -31,7 +32,8 @@ object MessageBuilder {
             type = msgType,
             direct = msgDirect,
             status = msgStatus,
-            account = ImSdkImpl.getAccount() ?: "",
+            senderId = ImSdkImpl.getAccount() ?: "",
+            receiverId = receiverId,
             time = System.currentTimeMillis(),
             attachment = TextAttachment().apply { content = msg }.toJson(true)
         )
@@ -43,6 +45,7 @@ object MessageBuilder {
         @MsgType msgType: Int = MsgType.IMAGE,
         @MsgDirection msgDirect: Int = MsgDirection.OUT,
         @MsgStatus msgStatus: Int = MsgStatus.SENDING,
+        receiverId: String = sessionId,
         localPath: String = "",
         mWidth: Int = 0,
         mHeight: Int = 0
@@ -53,7 +56,8 @@ object MessageBuilder {
             type = msgType,
             direct = msgDirect,
             status = msgStatus,
-            account = ImSdkImpl.getAccount() ?: "",
+            senderId = ImSdkImpl.getAccount() ?: "",
+            receiverId = receiverId,
             time = System.currentTimeMillis(),
             attachment = ImageAttachment().apply {
                 path = localPath

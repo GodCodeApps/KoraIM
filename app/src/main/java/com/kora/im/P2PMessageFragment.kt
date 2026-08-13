@@ -6,6 +6,9 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import com.kora.imcore.constant.SessionType
+import com.kora.imcore.IMClient
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 /**
  * Copyright 2026 GodCodeApps
@@ -25,15 +28,20 @@ class P2PMessageFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        childFragmentManager.beginTransaction().replace(
-            R.id.fragment_container,
-            TMessageFragment().apply {
-                val apply = Bundle().apply {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val existingSessionId = IMClient.getP2PConversation(peerAccount)?.sessionId.orEmpty()
+            childFragmentManager.beginTransaction().replace(
+                R.id.fragment_container,
+                TMessageFragment().apply {
+                    val apply = Bundle().apply {
                     putInt("session_type", SessionType.P2P)
-                    putString("session_id", peerAccount)
+                    putString("session_id", existingSessionId)
+                    putString("peer_id", peerAccount)
+                    }
+                    arguments=apply
                 }
-                arguments=apply
-            }).commit()
+            ).commit()
+        }
     }
 
     companion object {
