@@ -3,7 +3,7 @@ package com.kora.imcore.db
 import android.content.ContentValues
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
-import com.zchd.vsports.im.core.constant.MsgStatus
+import com.kora.imcore.constant.MsgStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 /**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
+ * Copyright 2026 GodCodeApps
  * @Author: pym
  * @Date: 2026/07/21:18:07
  * @Description: SQLite implementation of MessageDao
@@ -165,10 +165,11 @@ class MessageDao(private val dbHelper: ImAppDatabaseHelper) {
         db.beginTransaction()
         try {
             for (msg in message) {
-                db.insert(
+                db.insertWithOnConflict(
                     ImAppDatabaseHelper.TABLE_MESSAGE,
                     null,
-                    messageToContentValues(msg)
+                    messageToContentValues(msg),
+                    SQLiteDatabase.CONFLICT_REPLACE
                 )
             }
             db.setTransactionSuccessful()

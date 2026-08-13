@@ -7,6 +7,8 @@ import com.kora.imcore.IMClient
 import com.kora.imcore.ImSdkImpl
 import com.kora.imui.ImUIKitImpl
 import com.kora.imui.listener.sessionEventListener
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 
 class MainActivity : AppCompatActivity() {
@@ -43,10 +45,8 @@ class MainActivity : AppCompatActivity() {
             }
             onResendClickListener { msg ->
                 if (msg != null && msg is com.kora.imcore.db.Message) {
-                    msg.status = com.zchd.vsports.im.core.constant.MsgStatus.SENDING
-                    IMClient.updateMessageToLocal(msg)
-                    IMClient.getMessageChangeListener()?.invoke(msg)
-                    IMClient.sendMessage(msg)
+                    msg.status = com.kora.imcore.constant.MsgStatus.SENDING
+                    lifecycleScope.launch { IMClient.sendMessage(msg) }
                 }
             }
         })

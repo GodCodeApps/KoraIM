@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.kora.imcore">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <application>
-        <service android:name=".IMService" />
+        <service
+            android:name=".IMService"
+            android:exported="false" />
     </application>
 </manifest>

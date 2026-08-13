@@ -1,9 +1,9 @@
-package com.zchd.vsports.im.core.constant
+package com.kora.imcore.constant
 
 import androidx.annotation.IntDef
 
 /**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
+ * Copyright 2026 GodCodeApps
  * @Author: pym
  * @Date: 2026/07/16:18:14
  * @Description:消息状态

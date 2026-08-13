@@ -1,245 +1,97 @@
-@file:Suppress("unused", "MemberVisibilityCanBePrivate", "SpellCheckingInspection")
-
 package com.kora.imcore
 
 import android.content.Context
-import android.content.Intent
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.asLiveData
-import com.google.gson.Gson
+import com.kora.imcore.connection.ConnectionManager
 import com.kora.imcore.db.ImAppDatabaseHelper
 import com.kora.imcore.db.Message
 import com.kora.imcore.db.MessageDao
 import com.kora.imcore.db.UserDao
 import com.kora.imcore.db.UserInfo
+import com.kora.imcore.event.ConnectionState
+import com.kora.imcore.event.IMEventHub
 import com.kora.imcore.impl.IMMessage
 import com.kora.imcore.provider.IMUserInfoProvider
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import androidx.lifecycle.liveData
+import com.kora.imcore.repository.MessageRepository
+import com.kora.imcore.repository.UserRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 
-/**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
- * @Author: pym
- * @Date: 2026/07/22:11:40
- * @Description:
- */
+/** Public SDK facade. Transport, persistence and caches live in dedicated components. */
 object IMClient {
-    private var serviceProxy = ImServiceProxy()
+    val incomingMessages: SharedFlow<Message> get() = IMEventHub.incomingMessages
+    val messageUpdates: SharedFlow<Message> get() = IMEventHub.messageUpdates
+    val connectionState: StateFlow<ConnectionState> get() = IMEventHub.connectionState
 
-    private var onReceiveListener: ((Message) -> Unit)? = null
-    private var onMessageChangeListener: ((Message) -> Unit)? = null
-    private var receiveListeners = mutableMapOf<String, ((Message) -> Unit)>()
-    
-    private lateinit var messageDao: MessageDao
-    private lateinit var userDao: UserDao
-    
-    var userInfoProvider: IMUserInfoProvider? = null
-    
-    private val userInfoCache = mutableMapOf<String, UserInfo>()
-    
-    private val imScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var connectionManager: ConnectionManager? = null
+    private lateinit var messageRepository: MessageRepository
+    private lateinit var userRepository: UserRepository
 
-    /**
-     * 发送消息到底层 Service
-     */
-    fun sendMessage(msg: IMMessage) {
-        serviceProxy.senMessage(Gson().toJson(msg))
-    }
+    var userInfoProvider: IMUserInfoProvider?
+        get() = if (::userRepository.isInitialized) userRepository.provider else null
+        set(value) {
+            check(::userRepository.isInitialized) { "Call IMClient.init before setting userInfoProvider" }
+            userRepository.provider = value
+        }
 
-    /**
-     * 注册消息接收监听器
-     */
-    fun registerReceiveListener(context: Context, listener: ((Message) -> Unit)) {
-        receiveListeners[context.javaClass.name] = listener
-    }
-
-    /**
-     * 注销消息接收监听器
-     */
-    fun unRegisterReceiveListener(context: Context) {
-        receiveListeners.remove(context.javaClass.name)
-    }
-
-    /**
-     * 获取所有已注册的消息接收监听器
-     */
-    fun getReceiveListener(): List<((Message) -> Unit)?> {
-        return receiveListeners.values.toList()
-    }
-
-    /**
-     * 注册消息变更监听器 (如状态更新)
-     */
-    fun registerMessageChangeListener(listener: ((Message) -> Unit)?) {
-        onMessageChangeListener = listener
-    }
-
-    /**
-     * 注销消息变更监听器
-     */
-    fun unRegisterMessageChangeListener() {
-        onMessageChangeListener = null
-    }
-
-    /**
-     * 获取当前的消息变更监听器
-     */
-    fun getMessageChangeListener(): ((Message) -> Unit)? {
-        return onMessageChangeListener
-    }
-
-    /**
-     * 初始化 IM 客户端，绑定底层服务并建立连接
-     */
     fun init(context: Context, host: String, port: Int) {
+        require(host.isNotBlank()) { "host must not be blank" }
+        require(port in 1..65535) { "port must be between 1 and 65535" }
+        release()
         val appContext = context.applicationContext
+        val database = ImAppDatabaseHelper(appContext)
+        messageRepository = MessageRepository(MessageDao(database))
+        userRepository = UserRepository(UserDao(database), IMRuntime.scope)
+        IMRuntime.messages = messageRepository
         ImSdkImpl.init()
-        val dbHelper = ImAppDatabaseHelper(appContext)
-        messageDao = MessageDao(dbHelper)
-        userDao = UserDao(dbHelper)
-        
-        serviceProxy.setServerConfig(host, port)
-        
-        appContext.bindService(
-            Intent(appContext, IMService::class.java),
-            serviceProxy,
-            Context.BIND_AUTO_CREATE
-        )
+        connectionManager = ConnectionManager(appContext).also { it.connect(host, port) }
     }
 
-    /**
-     * 查询指定会话的最后一条消息
-     */
-    fun queryLaseMessageBySessionId(
-        sessionId: String
-    ): LiveData<Message>? {
-        return messageDao.getLaseMessageBySessionId(sessionId).flowOn(Dispatchers.IO)
-            ?.asLiveData()
-
+    suspend fun sendMessage(message: IMMessage) {
+        ensureInitialized()
+        messageRepository.upsert(message.getMessage())
+        connectionManager?.send(message)
     }
 
-    /**
-     * 查询指定会话的所有消息
-     */
-    fun queryAllMessageListBySessionId(
-        sessionId: String
-    ): LiveData<List<Message>>? {
-        return messageDao.getMessageBySessionId(sessionId)?.flowOn(Dispatchers.IO)?.asLiveData()
+    fun observeMessages(sessionId: String): Flow<List<Message>> {
+        ensureInitialized()
+        return messageRepository.observeSession(sessionId)
     }
 
-    /**
-     * 分页查询指定会话的消息列表
-     */
-    fun queryMessageListByPageSize(
-        sessionId: String,
-        page: Int
-    ): LiveData<List<Message>> = liveData(Dispatchers.IO) {
-        emit(messageDao.getMessageBySessionId(sessionId, page))
+    fun observeLastMessage(sessionId: String): Flow<Message> {
+        ensureInitialized()
+        return messageRepository.observeLastMessage(sessionId)
     }
 
-    /**
-     * 保存单条 IMMessage 到本地数据库
-     */
-    fun saveMessageToLocal(msg: IMMessage) {
-        imScope.launch {
-            messageDao.insertMessage(msg.getMessage())
-        }
+    suspend fun getMessagePage(sessionId: String, page: Int): List<Message> {
+        ensureInitialized()
+        return messageRepository.page(sessionId, page)
     }
 
-    /**
-     * 批量保存消息列表到本地数据库
-     */
-    fun saveMessageListToLocal(msg: List<Message>) {
-        imScope.launch {
-            messageDao.insertMessageList(msg)
-        }
+    suspend fun saveMessage(message: IMMessage) {
+        ensureInitialized()
+        messageRepository.upsert(message.getMessage())
     }
 
-    /**
-     * 更新或插入一条消息到本地数据库
-     */
-    fun updateMessageToLocal(message: Message) {
-        imScope.launch {
-            if (null != messageDao.getMessageByMessageId(message.getMsgId())) {
-                messageDao.updateMessage(message.getMsgId(), message.getMsgStatus())
-            } else {
-                messageDao.insertMessage(message)
-            }
-        }
+    suspend fun saveMessages(messages: List<Message>) {
+        ensureInitialized()
+        messageRepository.upsertAll(messages)
     }
 
-    /**
-     * 插入单条消息到本地数据库
-     */
-    fun insertMessage(message: Message) {
-        imScope.launch {
-            messageDao.insertMessage(message)
-        }
+    suspend fun getUserInfo(account: String?): UserInfo? {
+        ensureInitialized()
+        return userRepository.get(account)
     }
 
-    /**
-     * 清理资源 (暂未实现)
-     */
-    fun clear() {
-
+    fun release() {
+        connectionManager?.disconnect()
+        connectionManager = null
+        if (::userRepository.isInitialized) userRepository.clear()
     }
-    
-    /**
-     * 获取用户信息，支持三级缓存: 内存 -> 数据库 -> App层接口/服务器
-     */
-    fun getUserInfo(account: String?, callback: (UserInfo?) -> Unit) {
-        if (account.isNullOrEmpty()) {
-            callback(null)
-            return
-        }
-        
-        // 1. Check memory cache
-        val cachedInfo = userInfoCache[account]
-        if (cachedInfo != null) {
-            callback(cachedInfo)
-            return
-        }
-        
-        imScope.launch {
-            // 2. Check local database
-            var dbInfo = userDao.getUserInfo(account)
-            
-            // 3. Fallback to App layer provider if configured
-            if (dbInfo == null && userInfoProvider != null) {
-                // If it's a synchronous provider method
-                dbInfo = userInfoProvider?.getUserInfo(account)
-                if (dbInfo != null) {
-                    userDao.insertOrUpdateUserInfo(dbInfo)
-                }
-            }
-            
-            if (dbInfo != null) {
-                userInfoCache[account] = dbInfo
-                withContext(Dispatchers.Main) {
-                    callback(dbInfo)
-                }
-            } else {
-                // 4. If still null, trigger async fetch from server
-                userInfoProvider?.fetchUserInfoFromServer(account) { fetchedInfo ->
-                    if (fetchedInfo != null) {
-                        userInfoCache[account] = fetchedInfo
-                        imScope.launch {
-                            userDao.insertOrUpdateUserInfo(fetchedInfo)
-                        }
-                    }
-                    callback(fetchedInfo)
-                } ?: run {
-                    withContext(Dispatchers.Main) {
-                        callback(null)
-                    }
-                }
-            }
+
+    private fun ensureInitialized() {
+        check(connectionManager != null && ::messageRepository.isInitialized) {
+            "IMClient.init(context, host, port) must be called first"
         }
     }
 }

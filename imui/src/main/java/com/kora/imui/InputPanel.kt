@@ -1,4 +1,4 @@
-package com.zchd.vsports.im.ui
+package com.kora.imui
 
 import android.text.TextUtils
 import android.view.View
@@ -22,11 +22,11 @@ import com.luck.picture.lib.basic.PictureSelector
 import com.luck.picture.lib.config.SelectMimeType
 import com.luck.picture.lib.entity.LocalMedia
 import com.luck.picture.lib.interfaces.OnResultCallbackListener
-import com.zchd.vsports.im.core.constant.MsgStatus
+import com.kora.imcore.constant.MsgStatus
 
 
 /**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
+ * Copyright 2026 GodCodeApps
  * @Date: 2026/07/15:10:02
  * @Description:聊天底部输入区域控制
  */
@@ -211,8 +211,7 @@ class InputPanel(
                         time = System.currentTimeMillis(),
                         attachment = voiceAttach.toJson(false)
                     )
-                    com.kora.imcore.IMClient.sendMessage(msg)
-                    messageListPanelEx.addItemMsg(msg)
+                    proxy?.sendMessage(msg)
                 }
             }
 

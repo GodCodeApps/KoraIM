@@ -7,7 +7,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 
 /**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
+ * Copyright 2026 GodCodeApps
  * @Author: pym
  * @Date: 2026/07/15:10:24
  * @Description:

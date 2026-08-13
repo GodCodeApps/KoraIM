@@ -8,7 +8,7 @@ import com.kora.imui.attachment.TextAttachment
 import com.kora.imui.inputbox.EmojiDisplayUtils
 
 /**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
+ * Copyright 2026 GodCodeApps
  * @Author: pym
  * @Date: 2026/07/16:18:42
  * @Description:

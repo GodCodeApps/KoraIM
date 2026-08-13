@@ -10,6 +10,8 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.appcompat.widget.LinearLayoutCompat
 import androidx.recyclerview.widget.RecyclerView
+import androidx.lifecycle.findViewTreeLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.kora.imcore.IMClient
 import com.kora.imcore.constant.MsgDirection
@@ -18,10 +20,11 @@ import com.kora.imcore.impl.IMMessage
 import com.kora.imui.ImUIKitImpl
 import com.kora.imui.R
 import com.kora.imui.utils.TimeFormatUtils
-import com.zchd.vsports.im.core.constant.MsgStatus
+import com.kora.imcore.constant.MsgStatus
+import kotlinx.coroutines.launch
 
 /**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
+ * Copyright 2026 GodCodeApps
  * @Author: pym
  * @Date: 2026/07/16:18:42
  * @Description:
@@ -30,7 +33,7 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
     var mMessage: IMMessage? = null
     open fun getLayout(): Int = 0
     open fun isMiddleItem(): Boolean = false
-    open fun isReceivedMsg(): Boolean = mMessage?.getMsgDirection() === MsgDirection.IN
+    open fun isReceivedMsg(): Boolean = mMessage?.getMsgDirection() == MsgDirection.IN
     open fun bindViewHolder(view: View, message: IMMessage) {}
     open fun onBindViewHolder(message: IMMessage, prevMessage: IMMessage? = null) {
         this.mMessage = message
@@ -118,7 +121,10 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
         }
 
         // 2. 异步/同步获取用户信息
-        IMClient.getUserInfo(account) { userInfo ->
+        val boundMessageId = mMessage?.getMsgId()
+        itemView.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
+            val userInfo = IMClient.getUserInfo(account)
+            if (mMessage?.getMsgId() != boundMessageId) return@launch
             val avatarUrl = userInfo?.avatar
             targetAvatarView?.let { imageView ->
                 if (!avatarUrl.isNullOrEmpty()) {

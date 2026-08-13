@@ -1,79 +1,63 @@
-# ZCHD-Component
+# KoraIM
 
-Android组件仓库项目
+KoraIM 是由 GodCodeApps 开源的 Android IM 客户端框架。项目目前处于早期预览阶段，包含核心通信与本地存储模块、聊天 UI Kit，以及用于本地联调的 Node.js TCP 服务端。
 
-#### im - UI框架
+## 模块
 
-#### imCore - im核心（websocket层,db层）
+- `imcore`：TCP 长连接、消息 ACK、本地 SQLite 存储、用户资料缓存。
+- `imui`：文本、图片、语音消息展示和聊天输入面板。
+- `app`：Android 接入示例。
+- `server`：仅供开发联调的 Node.js 示例服务，不是生产级 IM 服务端。
 
-## 初始化启动服务
-    IMClient.init(context: Context, host: String, port: Int)
+详细组件边界与 Service 决策见 [客户端架构](docs/architecture.md)。
 
-## 设置当前用户id
+## 快速开始
 
-     ImSdkImpl.setAccount("test1")
+1. 启动测试服务：
 
-## 设置当前用户id
+   ```bash
+   cd server
+   npm start
+   ```
 
-     ImSdkImpl.setAccount("test1")
+2. 在示例 App 中配置测试服务器地址，然后初始化：
 
-## 新增消息类型
-     
-     MsgViewHolderFactory.register(ImageAttachment::class.java,MsgImageViewHolder::class.java)
-     com.kora.imcore.attachment.MsgAttachment下添加新的Attachment
+   ```kotlin
+   ImSdkImpl.setAccount("test2")
+   IMClient.init(applicationContext, "192.168.1.5", 8090)
+   ```
 
-## 消息数据结构说明
+3. 应用退出登录或彻底停止 IM 功能时释放资源：
 
-为了方便扩展和直观查阅，现将基础消息和目前支持的几类消息体（Text、Image）的数据结构梳理如下：
+   ```kotlin
+   IMClient.release()
+   ```
 
-### 1. 基础消息结构 (Message/IMMessage)
+## 传输协议
 
-所有消息最外层都遵循统一的基础数据库表/实体结构 `Message`。其中 `attachment` 字段用来存储各个具体消息类型的 JSON 字符串。
+当前协议使用 UTF-8、每行一个 JSON 帧。客户端发送 `message` 帧，服务端持久化或接受后应返回相同 `messageId` 的 `ack` 帧。只有收到 ACK，客户端才会把消息标记为发送成功。
 
-| 字段名 | 类型 | 说明 | 示例 |
-| :--- | :--- | :--- | :--- |
-| **id** | Long | 本地数据库自增主键 | `1`, `2` |
-| **messageId** | String | 消息的全局唯一 ID (UUID) | `"56c4d7e2-..."` |
-| **sessionType** | Int | 会话类型 (单聊/群聊等) | `1` (SessionType.None) |
-| **sessionId** | String | 会话标识ID | `"session123456789"` |
-| **account** | String | 发送者的账号 ID | `"test2"`, `"server_bot"` |
-| **type** | Int | 消息具体类型 (文本/图片/视频等) | `0` (文本), `1` (图片) |
-| **direct** | Int | 消息方向 (发送还是接收) | `0` (MsgDirection.OUT), `1` (MsgDirection.IN) |
-| **status** | Int | 消息状态 (发送中/成功/失败) | `1` (MsgStatus.SUCCESS) |
-| **time** | Long | 消息发送的时间戳 (ms) | `1786544136262` |
-| **attachment** | String | **[核心]** 附带的消息内容体（JSON格式）| `{"content":"你好"}` 或 `{"path":"/xx","width":100,"height":100}` |
-| **extra** | String | 扩展预留字段 | `""` |
-
----
-
-### 2. 文本消息结构 (TextAttachment)
-对应 `type = MsgType.TEXT`。
-
-| JSON 字段 | 类型 | 说明 |
-| :--- | :--- | :--- |
-| **content** | String | 文本消息的具体内容 |
-
-**`attachment` 存储示例：**
 ```json
-{"content":"那你弄"}
+{"type":"message","messageId":"uuid","payload":{"messageId":"uuid"}}
+{"type":"ack","messageId":"uuid"}
 ```
 
----
+该协议仍是预览版，后续版本会增加鉴权、心跳、协议版本、离线同步和送达/已读回执。
 
-### 3. 图片消息结构 (ImageAttachment)
-对应 `type = MsgType.IMAGE`。
+## 当前限制
 
-| JSON 字段 | 类型 | 说明 |
-| :--- | :--- | :--- |
-| **path** | String | 图片的本地绝对路径或网络 URL |
-| **width** | Int | 图片的原始宽度 (像素) |
-| **height** | Int | 图片的原始高度 (像素) |
+- 示例服务器仅用于本地开发，不包含账号鉴权、持久化和消息路由。
+- 暂未发布 Maven Central 坐标。
+- API 在 `1.0.0` 之前可能发生不兼容变更。
 
-**`attachment` 存储示例：**
-```json
-{
-  "path": "/storage/emulated/0/DCIM/Camera/ECommerce1786072459187.jpeg",
-  "width": 720,
-  "height": 1280
-}
+## 构建检查
+
+```bash
+./gradlew assembleDebug test lint
 ```
+
+## 许可证
+
+Copyright 2026 GodCodeApps
+
+本项目基于 [Apache License 2.0](LICENSE) 开源。

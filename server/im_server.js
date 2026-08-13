@@ -1,71 +1,56 @@
+// Copyright 2026 GodCodeApps. Licensed under the Apache License, Version 2.0.
 const net = require('net');
 const crypto = require('crypto');
 
-const PORT = 8090;
+const PORT = Number(process.env.PORT || 8090);
 
-// Create a TCP server
+function writeFrame(socket, frame) {
+    socket.write(`${JSON.stringify(frame)}\n`);
+}
+
 const server = net.createServer((socket) => {
-    console.log(`[+] New client connected: ${socket.remoteAddress}:${socket.remotePort}`);
-
-    // Set encoding to UTF-8 so data arrives as string
+    console.log(`[+] Client connected: ${socket.remoteAddress}:${socket.remotePort}`);
     socket.setEncoding('utf8');
+    let buffer = '';
 
-    socket.on('data', (data) => {
-        console.log(`[↓] Received data: ${data}`);
-
-        try {
-            // Android client sends a JSON string
-            const receivedMsg = JSON.parse(data);
-
-            // Extract text from attachment
-            let text = "";
-            try {
-                if (receivedMsg.attachment) {
-                    const attachObj = JSON.parse(receivedMsg.attachment);
-                    text = attachObj.content || "";
-                }
-            } catch(e) {}
-
-            // Construct an auto-reply message based on the incoming message
-            // msg.direct = 1 (MsgDirection.IN means received message)
-            // msg.status = 1 (SUCCESS)
-            const replyMsg = {
-                ...receivedMsg,
-                messageId: crypto.randomUUID(),      // Generate a new msg id
-                account: "server_bot",               // 改变发送者账号，不要跟自己一样
-                direct: 1,                           // 1 = IN (Received msg on Android)
-                status: 1,                           // 1 = SUCCESS
-                time: Date.now(),
-                attachment: receivedMsg.attachment,  // 原样返回内容！不再篡改
-                extra: ""
-            };
-
-            // Send back the JSON string
-            const replyString = JSON.stringify(replyMsg);
-            socket.write(replyString);
-            console.log(`[↑] Sent auto-reply: ${replyString}`);
-            
-        } catch (e) {
-            console.error(`[!] Failed to parse incoming JSON data: ${e.message}`);
+    socket.on('data', (chunk) => {
+        buffer += chunk;
+        let newlineIndex;
+        while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+            const line = buffer.slice(0, newlineIndex).trim();
+            buffer = buffer.slice(newlineIndex + 1);
+            if (line) handleFrame(socket, line);
         }
     });
 
-    socket.on('end', () => {
-        console.log(`[-] Client disconnected: ${socket.remoteAddress}:${socket.remotePort}`);
-    });
-
-    socket.on('error', (err) => {
-        console.error(`[x] Socket error: ${err.message}`);
-    });
+    socket.on('end', () => console.log('[-] Client disconnected'));
+    socket.on('error', (error) => console.error(`[x] Socket error: ${error.message}`));
 });
 
-server.on('error', (err) => {
-    console.error(`[x] Server error: ${err.message}`);
-});
+function handleFrame(socket, line) {
+    try {
+        const envelope = JSON.parse(line);
+        if (envelope.type !== 'message' || !envelope.payload || !envelope.messageId) {
+            throw new Error('Unsupported frame');
+        }
 
-server.listen(PORT, () => {
-    console.log(`=========================================`);
-    console.log(`🚀 IM Test Server is running on port ${PORT}`);
-    console.log(`Waiting for connections...`);
-    console.log(`=========================================`);
-});
+        writeFrame(socket, { type: 'ack', messageId: envelope.messageId });
+
+        const received = envelope.payload;
+        const reply = {
+            ...received,
+            id: 0,
+            messageId: crypto.randomUUID(),
+            account: 'server_bot',
+            direct: 1,
+            status: 1,
+            time: Date.now()
+        };
+        writeFrame(socket, { type: 'message', messageId: reply.messageId, payload: reply });
+    } catch (error) {
+        console.error(`[!] Invalid frame: ${error.message}`);
+    }
+}
+
+server.on('error', (error) => console.error(`[x] Server error: ${error.message}`));
+server.listen(PORT, () => console.log(`KoraIM test server listening on ${PORT}`));

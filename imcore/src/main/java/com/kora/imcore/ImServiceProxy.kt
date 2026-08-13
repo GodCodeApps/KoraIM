@@ -4,23 +4,15 @@ import android.content.ComponentName
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.util.Log
-import com.kora.imcore.aidl.ImAidlInterface
+import com.kora.imcore.event.ConnectionState
+import com.kora.imcore.event.IMEventHub
 import java.util.concurrent.ConcurrentLinkedQueue
 
-/**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
- * @Author: pym
- * @Date: 2026/07/24:14:17
- * @Description:
- */
-class ImServiceProxy : ServiceConnection {
-    private var asInterface: ImAidlInterface? = null
-    
-    private var host: String = ""
-    private var port: Int = 0
-    private var isConnected = false
-    
-    // Thread-safe queue for pending messages that are sent before the service is connected
+/** Same-process Service connection. IMService is intentionally not exported or remote. */
+internal class ImServiceProxy : ServiceConnection {
+    private var service: IMService? = null
+    private var host = ""
+    private var port = 0
     private val pendingMessages = ConcurrentLinkedQueue<String>()
 
     fun setServerConfig(host: String, port: Int) {
@@ -28,39 +20,29 @@ class ImServiceProxy : ServiceConnection {
         this.port = port
     }
 
-    fun senMessage(msg: String) {
-        if (isConnected && asInterface != null) {
-            asInterface?.send(msg)
-        } else {
-            Log.w("ImServiceProxy", "Service not connected yet. Message queued.")
-            pendingMessages.offer(msg)
-        }
+    fun sendMessage(message: String) {
+        service?.send(message) ?: pendingMessages.offer(message)
     }
-    
-    override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-        Log.i("ImServiceProxy", "onServiceConnected: bind success")
-        asInterface = ImAidlInterface.Stub.asInterface(service)
-        isConnected = true
-        
-        // Connect to the configured server
-        if (host.isNotEmpty() && port > 0) {
-            asInterface?.connect(host, port)
-        } else {
-            Log.e("ImServiceProxy", "Server configuration is missing! Cannot connect.")
-        }
-        
-        // Flush pending messages
-        while (!pendingMessages.isEmpty()) {
-            val msg = pendingMessages.poll()
-            if (msg != null) {
-                asInterface?.send(msg)
-            }
-        }
+
+    fun disconnect() {
+        service?.disconnect()
+        service = null
+        pendingMessages.clear()
+        IMEventHub.setConnectionState(ConnectionState.Disconnected)
+    }
+
+    override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+        service = (binder as? IMService.LocalBinder)?.service
+        val connectedService = service ?: return
+        connectedService.connect(host, port)
+        while (true) connectedService.send(pendingMessages.poll() ?: break)
     }
 
     override fun onServiceDisconnected(name: ComponentName?) {
-        Log.w("ImServiceProxy", "onServiceDisconnected: connection lost")
-        asInterface = null
-        isConnected = false
+        Log.w(TAG, "IM service disconnected")
+        service = null
+        IMEventHub.setConnectionState(ConnectionState.Disconnected)
     }
+
+    private companion object { const val TAG = "KoraIM" }
 }

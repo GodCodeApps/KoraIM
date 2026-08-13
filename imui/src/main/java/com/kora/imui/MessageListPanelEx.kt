@@ -12,12 +12,16 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.kora.imcore.IMClient
 import com.kora.imcore.impl.IMMessage
 import com.kora.imui.adapter.MsgListAdapter
+import kotlinx.coroutines.launch
 
 /**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
+ * Copyright 2026 GodCodeApps
  * @Author: pym
  * @Date: 2021/4/28 10:10
  * @Description:管理消息列表
@@ -52,7 +56,7 @@ class MessageListPanelEx(
         recyclerVew.layoutManager = mLinearLayoutManager
         recyclerVew.adapter = mMessageAdapter
         recyclerVew.itemAnimator?.changeDuration = 0
-        loadMessageHistory()
+        observeMessages()
 //        refreshLayout?.setOnRefreshListener {
 //            mPage++
 //            loadMessageHistory()
@@ -76,28 +80,19 @@ class MessageListPanelEx(
             imm.hideSoftInputFromWindow(edInputText.windowToken, 0)
             false
         }
-        observerMsgChangerListener()
     }
 
-    private fun observerMsgChangerListener() {
-        IMClient.registerReceiveListener(context.requireContext()) {
-            mMessageAdapter?.addItem(it)
-            scrollToBottom()
-        }
-        IMClient.registerMessageChangeListener {
-            mMessageAdapter?.notify(it)
-
-        }
-    }
-
-    private fun loadMessageHistory() {
-        IMClient.queryAllMessageListBySessionId( sessionId)?.observe(context) {
-                Log.e("loadMessageHistory", it.toString())
-                mMessageAdapter?.clear()
-                mMessageAdapter?.addList(it)
-                scrollToBottom()
+    private fun observeMessages() {
+        context.viewLifecycleOwner.lifecycleScope.launch {
+            context.viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                IMClient.observeMessages(sessionId).collect {
+                    Log.e("loadMessageHistory", it.toString())
+                    mMessageAdapter?.clear()
+                    mMessageAdapter?.addList(it)
+                    scrollToBottom()
+                }
             }
-
+        }
     }
 
     fun addItemMsg(message: IMMessage) {

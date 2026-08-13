@@ -11,8 +11,9 @@ android {
         }
     }
 
-    buildFeatures {
-        aidl = true
+    defaultConfig {
+        minSdk = 24
+        consumerProguardFiles("consumer-rules.pro")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

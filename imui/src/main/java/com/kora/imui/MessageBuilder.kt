@@ -8,10 +8,10 @@ import com.kora.imcore.db.Message
 import com.kora.imcore.impl.IMMessage
 import com.kora.imui.attachment.ImageAttachment
 import com.kora.imui.attachment.TextAttachment
-import com.zchd.vsports.im.core.constant.MsgStatus
+import com.kora.imcore.constant.MsgStatus
 
 /**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
+ * Copyright 2026 GodCodeApps
  * @Author: pym
  * @Date: 2026/07/20:09:32
  * @Description:构建消息实例

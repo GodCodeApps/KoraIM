@@ -6,6 +6,6 @@
   "scripts": {
     "start": "node im_server.js"
   },
-  "author": "",
-  "license": "ISC"
+  "author": "GodCodeApps",
+  "license": "Apache-2.0"
 }

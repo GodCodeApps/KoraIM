@@ -12,12 +12,14 @@ import com.kora.imcore.impl.IMMessage
 import com.kora.imui.MessageListPanelEx
 import com.kora.imui.R
 import com.kora.imui.module.ModuleProxy
-import com.zchd.vsports.im.ui.InputPanel
+import com.kora.imui.InputPanel
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 /**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
+ * Copyright 2026 GodCodeApps
  * @Author: pym
  * @Date: 2026/07/15:09:35
  * @Description:im基类
@@ -50,7 +52,8 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
         tvTitle?.text = sessionId
         
         // 尝试从 Provider 获取真实的用户名
-        IMClient.getUserInfo(sessionId) { userInfo ->
+        viewLifecycleOwner.lifecycleScope.launch {
+            val userInfo = IMClient.getUserInfo(sessionId)
             if (userInfo != null && !userInfo.nickname.isNullOrEmpty()) {
                 tvTitle?.text = userInfo.nickname
             }
@@ -69,18 +72,12 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
         return requireActivity()
     }
 
-    override fun onDestroy() {
-        IMClient.clear()
-        super.onDestroy()
-    }
-
     override fun sendMessage(msg: IMMessage): Boolean {
         if (sessionId != msg.getIMSessionId()) {
             return false
         }
-        IMClient.saveMessageToLocal(msg)
         messageListPanelEx?.addItemMsg(msg)
-        IMClient.sendMessage(msg)
+        viewLifecycleOwner.lifecycleScope.launch { IMClient.sendMessage(msg) }
         return true
     }
 }

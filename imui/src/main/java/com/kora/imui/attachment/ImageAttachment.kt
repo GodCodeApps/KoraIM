@@ -6,7 +6,7 @@ import org.json.JSONException
 import org.json.JSONObject
 
 /**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
+ * Copyright 2026 GodCodeApps
  * @Author: pym
  * @Date: 2021/4/30 15:54
  * @Description:

@@ -2,140 +2,145 @@ package com.kora.imcore
 
 import android.app.Service
 import android.content.Intent
+import android.os.Handler
 import android.os.IBinder
+import android.os.Binder
+import android.os.Looper
 import android.util.Log
 import com.google.gson.Gson
-import com.kora.imcore.aidl.ImAidlInterface
+import com.kora.imcore.constant.MsgStatus
 import com.kora.imcore.db.Message
-import com.zchd.vsports.im.core.constant.MsgStatus
 import com.kora.imcore.netty.ChatClientInitializer
+import com.kora.imcore.netty.PendingAckRegistry
+import com.kora.imcore.netty.WireEnvelope
+import com.kora.imcore.event.ConnectionState
+import com.kora.imcore.event.IMEventHub
 import io.netty.bootstrap.Bootstrap
-import io.netty.channel.AdaptiveRecvByteBufAllocator
-import io.netty.channel.ChannelFuture
+import io.netty.channel.Channel
 import io.netty.channel.ChannelOption
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import java.net.InetSocketAddress
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
- * @Author: pym
- * @Date: 2026/07/16:17:27
- * @Description:
- */
 class IMService : Service() {
-    companion object {
-        var TAG = "IWebSocketListener"
+    private val gson = Gson()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val eventLoopGroup = NioEventLoopGroup(1)
+    private val connecting = AtomicBoolean(false)
+    private var channel: Channel? = null
+    private var host = ""
+    private var port = 0
+    private var reconnectAttempt = 0
+    private var released = false
+    private val outgoingMessages = ConcurrentLinkedQueue<Message>()
+
+    inner class LocalBinder : Binder() { val service: IMService get() = this@IMService }
+    private val binder = LocalBinder()
+
+    override fun onBind(intent: Intent?): IBinder = binder
+
+    internal fun connect(host: String, port: Int) {
+        this.host = host
+        this.port = port
+        released = false
+        connectIfNeeded()
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
-        return ImIBinder()
+    internal fun send(json: String) {
+        val message = runCatching { gson.fromJson(json, Message::class.java) }.getOrNull() ?: return
+        sendWithAck(message)
     }
 
-    class ImIBinder : ImAidlInterface.Stub() {
-        var channelFuture: ChannelFuture? = null
-        private var host = ""
-        private var port = 0
-        private var bootstrap: Bootstrap? = null
-        override fun connect(host: String, port: Int) {
-            this.host = host
-            this.port = port
-            GlobalScope.launch {
-                try {
-                    System.setProperty("io.netty.noUnsafe", "true")
-                    io.netty.util.internal.logging.InternalLoggerFactory.setDefaultFactory(io.netty.util.internal.logging.JdkLoggerFactory.INSTANCE)
-                    var group = NioEventLoopGroup()
-                    bootstrap = Bootstrap()
-                        .group(group)
-                        .option(ChannelOption.TCP_NODELAY, true)//无阻塞
-                        .option(ChannelOption.SO_KEEPALIVE, true)//长链接
-                        .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 3000)//连接超时
-                        .option(
-                            ChannelOption.RCVBUF_ALLOCATOR,
-                            AdaptiveRecvByteBufAllocator(5000, 5000, 8000)
-                        )
-                        .channel(NioSocketChannel::class.java)
-                        .handler(ChatClientInitializer())
-                    connect()
-                } catch (e: Exception) {
-                }
+    internal fun disconnect() {
+        released = true
+        channel?.close()
+        channel = null
+        PendingAckRegistry.failAll()
+        outgoingMessages.clear()
+        IMEventHub.setConnectionState(ConnectionState.Disconnected)
+    }
+
+    private fun connectIfNeeded() {
+        val activeChannel = channel
+        if (activeChannel?.isActive == true) {
+            drainOutgoingMessages()
+            return
+        }
+        if (host.isBlank() || port !in 1..65535 || !connecting.compareAndSet(false, true)) return
+        IMEventHub.setConnectionState(ConnectionState.Connecting)
+
+        val bootstrap = Bootstrap()
+            .group(eventLoopGroup)
+            .channel(NioSocketChannel::class.java)
+            .option(ChannelOption.TCP_NODELAY, true)
+            .option(ChannelOption.SO_KEEPALIVE, true)
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5_000)
+            .handler(ChatClientInitializer(::scheduleReconnect))
+
+        bootstrap.connect(InetSocketAddress(host, port)).addListener { future ->
+            connecting.set(false)
+            if (future.isSuccess) {
+                channel = (future as io.netty.channel.ChannelFuture).channel()
+                reconnectAttempt = 0
+                Log.i(TAG, "Connected to $host:$port")
+                IMEventHub.setConnectionState(ConnectionState.Connected(host, port))
+                drainOutgoingMessages()
+            } else {
+                Log.w(TAG, "Connection failed", future.cause())
+                IMEventHub.setConnectionState(ConnectionState.Failed(future.cause()?.message ?: "Connection failed"))
+                scheduleReconnect()
             }
         }
+    }
 
-        override fun send(msg: String?) {
-            if (msg != null && msg.isNotEmpty()) {
-                Log.d(TAG, "send: $msg")
-                val message = try {
-                    Gson().fromJson(msg, Message::class.java)
-                } catch (e: Exception) {
-                    null
-                } ?: return
+    private fun scheduleReconnect() {
+        channel = null
+        if (released || eventLoopGroup.isShuttingDown) return
+        val delaySeconds = (1L shl reconnectAttempt.coerceAtMost(5))
+        reconnectAttempt++
+        eventLoopGroup.schedule({ connectIfNeeded() }, delaySeconds, TimeUnit.SECONDS)
+    }
 
-                val handler = android.os.Handler(android.os.Looper.getMainLooper())
-                var isDone = false
+    private fun sendWithAck(message: Message) {
+        val timeout = Runnable {
+            outgoingMessages.remove(message)
+            PendingAckRegistry.fail(message.messageId)
+        }
+        PendingAckRegistry.register(message.messageId) { acknowledged ->
+            mainHandler.removeCallbacks(timeout)
+            message.status = if (acknowledged) MsgStatus.SUCCESS else MsgStatus.FAIL
+            IMRuntime.updated(message)
+        }
+        mainHandler.postDelayed(timeout, ACK_TIMEOUT_MS)
+        outgoingMessages.offer(message)
+        connectIfNeeded()
+    }
 
-                val timeoutRunnable = Runnable {
-                    if (!isDone) {
-                        isDone = true
-                        Log.d(TAG, "send timeout!")
-                        message.status = MsgStatus.FAIL
-                        IMClient.updateMessageToLocal(message)
-                        IMClient.getMessageChangeListener()?.invoke(message)
-                    }
-                }
-                
-                // 10 seconds timeout for sending
-                handler.postDelayed(timeoutRunnable, 10000)
-
-                val futureListener = io.netty.channel.ChannelFutureListener { future ->
-                    handler.post {
-                        if (!isDone) {
-                            isDone = true
-                            handler.removeCallbacks(timeoutRunnable)
-                            if (future != null && future.isSuccess) {
-                                Log.d(TAG, "send success")
-                                message.status = MsgStatus.SUCCESS
-                            } else {
-                                Log.d(TAG, "send failed")
-                                message.status = MsgStatus.FAIL
-                            }
-                            IMClient.updateMessageToLocal(message)
-                            IMClient.getMessageChangeListener()?.invoke(message)
-                        }
-                    }
-                }
-
-                if (needReConnect()) {
-                    connect { success ->
-                        if (success) {
-                            channelFuture?.channel()?.writeAndFlush(msg)?.addListener(futureListener)
-                        } else {
-                            handler.post { futureListener.operationComplete(null) }
-                        }
-                    }
-                } else {
-                    channelFuture?.channel()?.writeAndFlush(msg)?.addListener(futureListener)
-                }
+    private fun drainOutgoingMessages() {
+        val activeChannel = channel?.takeIf { it.isActive } ?: return
+        while (true) {
+            val message = outgoingMessages.poll() ?: break
+            activeChannel.writeAndFlush(WireEnvelope.message(message).encode(gson)).addListener { future ->
+                if (!future.isSuccess) PendingAckRegistry.fail(message.messageId)
             }
         }
+    }
 
-        private fun needReConnect(): Boolean {
-            return !(channelFuture != null && channelFuture?.channel()?.isActive == true)
-        }
+    override fun onDestroy() {
+        released = true
+        mainHandler.removeCallbacksAndMessages(null)
+        PendingAckRegistry.failAll()
+        outgoingMessages.clear()
+        channel?.close()
+        eventLoopGroup.shutdownGracefully()
+        super.onDestroy()
+    }
 
-        private fun connect(cb: ((Boolean) -> Unit)? = null) {
-            val inetSocketAddress = InetSocketAddress(host, port)
-            channelFuture = bootstrap?.connect(inetSocketAddress)?.addListener {
-                if (it.isSuccess) {
-                    Log.d(TAG, "链接成功")
-                    cb?.invoke(true)
-                } else {
-                    Log.d(TAG, "链接失败")
-                    cb?.invoke(false)
-                }
-            }
-        }
+    private companion object {
+        const val TAG = "KoraIM"
+        const val ACK_TIMEOUT_MS = 10_000L
     }
 }

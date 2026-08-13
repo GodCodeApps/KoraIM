@@ -3,12 +3,12 @@ package com.kora.imcore.constant
 import androidx.annotation.IntDef
 
 /**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
+ * Copyright 2026 GodCodeApps
  * @Author: pym
  * @Date: 2026/07/15:10:12
  * @Description:基本消息类型
  */
-@IntDef(MsgType.UNDEF, MsgType.TEXT, MsgType.IMAGE, MsgType.VIDEO, MsgType.TIP)
+@IntDef(MsgType.UNDEF, MsgType.TEXT, MsgType.IMAGE, MsgType.VIDEO, MsgType.TIP, MsgType.VOICE)
 @Retention(AnnotationRetention.SOURCE)
 annotation class MsgType {
     companion object {

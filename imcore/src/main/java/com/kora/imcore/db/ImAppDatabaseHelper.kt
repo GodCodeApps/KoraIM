@@ -8,7 +8,7 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
 
     companion object {
         const val DATABASE_NAME = "im_app_database.db"
-        const val DATABASE_VERSION = 3
+        const val DATABASE_VERSION = 4
 
         const val TABLE_MESSAGE = "message"
         const val TABLE_USER_INFO = "user_info"
@@ -37,7 +37,7 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
         val createMessageTable = """
             CREATE TABLE IF NOT EXISTS $TABLE_MESSAGE (
                 $COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                $COLUMN_MESSAGE_ID TEXT NOT NULL,
+                $COLUMN_MESSAGE_ID TEXT NOT NULL UNIQUE,
                 $COLUMN_SESSION_TYPE INTEGER NOT NULL,
                 $COLUMN_SESSION_ID TEXT NOT NULL,
                 $COLUMN_TYPE INTEGER NOT NULL,
@@ -61,13 +61,31 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
         
         db.execSQL(createMessageTable)
         db.execSQL(createUserTable)
+        createIndexes(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Simple upgrade strategy: drop and recreate (since Room schema export was false and we don't have migrations)
-        // In a real app you might want ALTER TABLE, but we'll follow Room's destructive migration if none provided
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_MESSAGE")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_USER_INFO")
-        onCreate(db)
+        if (oldVersion < 4) {
+            // Keep the newest local row when old databases contain duplicated message ids.
+            db.execSQL(
+                "DELETE FROM $TABLE_MESSAGE WHERE $COLUMN_ID NOT IN " +
+                    "(SELECT MAX($COLUMN_ID) FROM $TABLE_MESSAGE GROUP BY $COLUMN_MESSAGE_ID)"
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS index_message_messageId " +
+                    "ON $TABLE_MESSAGE($COLUMN_MESSAGE_ID)"
+            )
+            createIndexes(db)
+        }
+    }
+
+    private fun createIndexes(db: SQLiteDatabase) {
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_message_session_time " +
+                "ON $TABLE_MESSAGE($COLUMN_SESSION_ID, $COLUMN_TIME DESC)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_message_status ON $TABLE_MESSAGE($COLUMN_STATUS)"
+        )
     }
 }

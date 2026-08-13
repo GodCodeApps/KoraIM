@@ -5,14 +5,14 @@ import com.google.gson.Gson
 import com.kora.imcore.ImSdkImpl
 import com.kora.imcore.attachment.MsgAttachment
 import com.kora.imcore.constant.MsgDirection
-import com.zchd.vsports.im.core.constant.MsgStatus
+import com.kora.imcore.constant.MsgStatus
 import com.kora.imcore.constant.MsgType
 import com.kora.imcore.constant.SessionType
 import com.kora.imcore.impl.IMMessage
 import java.util.*
 
 /**
- * Copyright (C), 2020-2021, 中传互动（湖北）信息技术有限公司
+ * Copyright 2026 GodCodeApps
  * @Author: pym
  * @Date: 2026/07/21:18:04
  * @Description:
