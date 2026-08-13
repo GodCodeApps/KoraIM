@@ -8,6 +8,7 @@ import com.kora.imcore.db.Message
 import com.kora.imcore.impl.IMMessage
 import com.kora.imui.attachment.ImageAttachment
 import com.kora.imui.attachment.TextAttachment
+import com.kora.imui.attachment.VideoAttachment
 import com.kora.imcore.constant.MsgStatus
 
 /**
@@ -17,6 +18,23 @@ import com.kora.imcore.constant.MsgStatus
  * @Description:构建消息实例
  */
 object MessageBuilder {
+    fun createVideoMessage(
+        sessionId: String,
+        @SessionType sessionType: Int,
+        receiverId: String,
+        attachment: VideoAttachment
+    ): IMMessage = Message(
+        sessionId = sessionId,
+        sessionType = sessionType,
+        senderId = ImSdkImpl.getAccount() ?: "",
+        receiverId = receiverId,
+        type = MsgType.VIDEO,
+        direct = MsgDirection.OUT,
+        status = MsgStatus.SENDING,
+        time = System.currentTimeMillis(),
+        attachment = attachment.toJson(false)
+    )
+
     fun createTextMessage(
         sessionId: String,
         @SessionType sessionType: Int = SessionType.None,

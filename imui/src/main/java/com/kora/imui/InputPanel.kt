@@ -10,9 +10,11 @@ import com.kora.imcore.constant.SessionType
 import com.kora.imcore.db.Message
 import com.kora.imui.MessageBuilder.createTextMessage
 import com.kora.imui.MessageBuilder.createImageMessage
+import com.kora.imui.MessageBuilder.createVideoMessage
 import com.kora.imui.MessageListPanelEx
 import com.kora.imui.R
 import com.kora.imui.attachment.VoiceAttachment
+import com.kora.imui.attachment.VideoAttachment
 import com.kora.imui.bean.BaseInputAction
 import com.kora.imui.inputbox.ChatInputView
 import com.kora.imui.inputbox.ChatInputView.OnInputListener
@@ -23,6 +25,11 @@ import com.luck.picture.lib.config.SelectMimeType
 import com.luck.picture.lib.entity.LocalMedia
 import com.luck.picture.lib.interfaces.OnResultCallbackListener
 import com.kora.imcore.constant.MsgStatus
+import androidx.lifecycle.lifecycleScope
+import com.kora.imui.utils.VideoMetadataUtils
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 
 /**
@@ -136,7 +143,7 @@ class InputPanel(
             }
 
             override fun onMoreOptionClick(optionName: String?) {
-                if (optionName.equals("相册")) {
+                if (optionName.equals("图片")) {
                     PictureSelector.create(proxy?.getAppActivity())
                         .openGallery(SelectMimeType.ofImage())
                         .setImageEngine(GlideEngine.createGlideEngine())
@@ -155,6 +162,44 @@ class InputPanel(
                                         mHeight = media.height
                                     )
                                     proxy?.sendMessage(msg)
+                                }
+                            }
+
+                            override fun onCancel() {
+                            }
+                        })
+                    return
+                } else if (optionName.equals("视频")) {
+                    PictureSelector.create(proxy?.getAppActivity())
+                        .openGallery(SelectMimeType.ofVideo())
+                        .setImageEngine(GlideEngine.createGlideEngine())
+                        .setMaxSelectNum(1)
+                        .forResult(object : OnResultCallbackListener<LocalMedia?> {
+                            override fun onResult(result: ArrayList<LocalMedia?>) {
+                                val media = result.firstOrNull() ?: return
+                                val path = media.realPath ?: media.availablePath ?: media.path
+                                if (path.isNullOrBlank()) return
+                                fragment.viewLifecycleOwner.lifecycleScope.launch {
+                                    val coverPath = withContext(Dispatchers.IO) {
+                                        VideoMetadataUtils.createCover(fragment.requireContext(), path)
+                                    }
+                                    val attachment = VideoAttachment().apply {
+                                        localPath = path
+                                        localCoverPath = coverPath
+                                        duration = media.duration
+                                        width = media.width
+                                        height = media.height
+                                        size = media.size
+                                        mimeType = media.mimeType.orEmpty()
+                                    }
+                                    proxy?.sendMessage(
+                                        createVideoMessage(
+                                            sessionId = sessionId,
+                                            sessionType = sessionType,
+                                            receiverId = peerId.ifBlank { sessionId },
+                                            attachment = attachment
+                                        )
+                                    )
                                 }
                             }
 

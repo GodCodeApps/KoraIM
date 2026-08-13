@@ -38,6 +38,7 @@ class IMService : Service() {
     private var reconnectAttempt = 0
     private var released = false
     private val outgoingMessages = ConcurrentLinkedQueue<Message>()
+    @Volatile private var inFlightMessage: Message? = null
 
     inner class LocalBinder : Binder() { val service: IMService get() = this@IMService }
     private val binder = LocalBinder()
@@ -62,8 +63,8 @@ class IMService : Service() {
         released = true
         channel?.close()
         channel = null
-        PendingAckRegistry.failAll()
         outgoingMessages.clear()
+        PendingAckRegistry.failAll()
         IMEventHub.setConnectionState(ConnectionState.Disconnected)
     }
 
@@ -117,23 +118,38 @@ class IMService : Service() {
         }
         PendingAckRegistry.register(message.messageId) { result ->
             mainHandler.removeCallbacks(timeout)
-            if (result.success && !result.sessionId.isNullOrBlank()) message.sessionId = result.sessionId
+            if (result.success && !result.sessionId.isNullOrBlank()) {
+                message.sessionId = result.sessionId
+                outgoingMessages.forEach { queued ->
+                    if (queued.sessionId.isBlank() && queued.receiverId == message.receiverId) {
+                        queued.sessionId = result.sessionId
+                    }
+                }
+            }
             message.status = if (result.success) MsgStatus.SUCCESS else MsgStatus.FAIL
             IMRuntime.updated(message)
+            completeOutgoing(message)
         }
         mainHandler.postDelayed(timeout, ACK_TIMEOUT_MS)
         outgoingMessages.offer(message)
         connectIfNeeded()
     }
 
+    @Synchronized
     private fun drainOutgoingMessages() {
+        if (inFlightMessage != null) return
         val activeChannel = channel?.takeIf { it.isActive } ?: return
-        while (true) {
-            val message = outgoingMessages.poll() ?: break
-            activeChannel.writeAndFlush(WireEnvelope.message(message).encode(gson)).addListener { future ->
-                if (!future.isSuccess) PendingAckRegistry.fail(message.messageId)
-            }
+        val message = outgoingMessages.poll() ?: return
+        inFlightMessage = message
+        activeChannel.writeAndFlush(WireEnvelope.message(message).encode(gson)).addListener { future ->
+            if (!future.isSuccess) PendingAckRegistry.fail(message.messageId)
         }
+    }
+
+    @Synchronized
+    private fun completeOutgoing(message: Message) {
+        if (inFlightMessage?.messageId == message.messageId) inFlightMessage = null
+        if (!released) drainOutgoingMessages()
     }
 
     override fun onDestroy() {
@@ -141,6 +157,7 @@ class IMService : Service() {
         mainHandler.removeCallbacksAndMessages(null)
         PendingAckRegistry.failAll()
         outgoingMessages.clear()
+        inFlightMessage = null
         channel?.close()
         eventLoopGroup.shutdownGracefully()
         super.onDestroy()
