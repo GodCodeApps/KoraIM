@@ -42,11 +42,11 @@ internal class ConversationListAdapter(
         val item = getItem(position)
         val conversation = item.conversation
         view.findViewById<TextView>(R.id.im_conversation_title).text = item.title
-        view.findViewById<TextView>(R.id.im_conversation_type).text = when (conversation.sessionType) {
-            SessionType.P2P -> "单聊"
-            SessionType.GROUP -> "群聊"
-            else -> "会话"
-        }
+//        view.findViewById<TextView>(R.id.im_conversation_type).text = when (conversation.sessionType) {
+//            SessionType.P2P -> "单聊"
+//            SessionType.GROUP -> "群聊"
+//            else -> "会话"
+//        }
         view.findViewById<TextView>(R.id.im_conversation_preview).text = conversation.lastMessagePreview
         view.findViewById<TextView>(R.id.im_conversation_time).text =
             conversation.lastMessageTime.takeIf { it > 0 }?.let { timeFormat.format(Date(it)) }.orEmpty()

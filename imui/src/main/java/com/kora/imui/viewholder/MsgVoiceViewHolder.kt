@@ -7,6 +7,7 @@ import android.widget.TextView
 import com.kora.imcore.impl.IMMessage
 import com.kora.imui.R
 import com.kora.imui.attachment.VoiceAttachment
+import java.io.File
 
 class MsgVoiceViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
 
@@ -52,7 +53,10 @@ class MsgVoiceViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
             val animationDrawable = ivVoiceWave.drawable as android.graphics.drawable.AnimationDrawable
             animationDrawable.start()
 
-            com.kora.imui.utils.AudioPlayHelper.playAudio(voiceAttachment.path) {
+            val source = voiceAttachment.localPath
+                .takeIf { it.isNotBlank() && File(it).isFile }
+                ?: voiceAttachment.remoteUrl
+            com.kora.imui.utils.AudioPlayHelper.playAudio(source) {
                 // Completion callback
                 animationDrawable.stop()
                 ivVoiceWave.setImageResource(R.drawable.ic_chat_voice_3)

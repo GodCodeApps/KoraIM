@@ -10,10 +10,10 @@
         android:id="@+id/tv_time"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="4dp"
         android:textColor="#B3B3B3"
         android:textSize="12sp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
@@ -81,8 +81,8 @@
             android:id="@+id/iv_right_avatar"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:layout_marginStart="6dp"
             android:scaleType="centerCrop"
+            android:layout_marginStart="6dp"
             android:src="@android:color/holo_green_light" />
     </androidx.appcompat.widget.LinearLayoutCompat>
 </androidx.constraintlayout.widget.ConstraintLayout>

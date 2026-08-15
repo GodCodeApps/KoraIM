@@ -26,10 +26,8 @@ import com.luck.picture.lib.entity.LocalMedia
 import com.luck.picture.lib.interfaces.OnResultCallbackListener
 import com.kora.imcore.constant.MsgStatus
 import androidx.lifecycle.lifecycleScope
-import com.kora.imui.utils.VideoMetadataUtils
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.kora.imui.IMMediaMessageSender
 
 
 /**
@@ -47,6 +45,11 @@ class InputPanel(
     var rootView: View,
     var messageListPanelEx: MessageListPanelEx
 ) {
+    private fun queueMediaMessage(message: Message) {
+        messageListPanelEx.addItemMsg(message)
+        IMMediaMessageSender.enqueue(message)
+    }
+
     fun updateSessionId(value: String) {
         sessionId = value
     }
@@ -159,9 +162,11 @@ class InputPanel(
                                         receiverId = peerId.ifBlank { sessionId },
                                         localPath = path,
                                         mWidth = media.width,
-                                        mHeight = media.height
+                                        mHeight = media.height,
+                                        size = media.size,
+                                        mimeType = media.mimeType.orEmpty()
                                     )
-                                    proxy?.sendMessage(msg)
+                                    queueMediaMessage(msg.getMessage())
                                 }
                             }
 
@@ -179,28 +184,22 @@ class InputPanel(
                                 val media = result.firstOrNull() ?: return
                                 val path = media.realPath ?: media.availablePath ?: media.path
                                 if (path.isNullOrBlank()) return
-                                fragment.viewLifecycleOwner.lifecycleScope.launch {
-                                    val coverPath = withContext(Dispatchers.IO) {
-                                        VideoMetadataUtils.createCover(fragment.requireContext(), path)
-                                    }
-                                    val attachment = VideoAttachment().apply {
-                                        localPath = path
-                                        localCoverPath = coverPath
-                                        duration = media.duration
-                                        width = media.width
-                                        height = media.height
-                                        size = media.size
-                                        mimeType = media.mimeType.orEmpty()
-                                    }
-                                    proxy?.sendMessage(
-                                        createVideoMessage(
-                                            sessionId = sessionId,
-                                            sessionType = sessionType,
-                                            receiverId = peerId.ifBlank { sessionId },
-                                            attachment = attachment
-                                        )
-                                    )
+                                val attachment = VideoAttachment().apply {
+                                    localPath = path
+                                    duration = media.duration
+                                    width = media.width
+                                    height = media.height
+                                    size = media.size
+                                    mimeType = media.mimeType.orEmpty()
                                 }
+                                queueMediaMessage(
+                                    createVideoMessage(
+                                        sessionId = sessionId,
+                                        sessionType = sessionType,
+                                        receiverId = peerId.ifBlank { sessionId },
+                                        attachment = attachment
+                                    ).getMessage()
+                                )
                             }
 
                             override fun onCancel() {
@@ -259,8 +258,10 @@ class InputPanel(
 
                     // Create VoiceAttachment
                     val voiceAttach = VoiceAttachment().apply {
-                        this.path = path
+                        this.localPath = path
                         this.duration = duration
+                        this.size = java.io.File(path).length()
+                        this.mimeType = "audio/mp4"
                     }
                     val msg = Message(
                         sessionType = sessionType,
@@ -273,7 +274,7 @@ class InputPanel(
                         time = System.currentTimeMillis(),
                         attachment = voiceAttach.toJson(false)
                     )
-                    proxy?.sendMessage(msg)
+                    queueMediaMessage(msg)
                 }
             }
 

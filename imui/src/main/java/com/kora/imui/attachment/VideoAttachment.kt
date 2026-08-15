@@ -35,10 +35,9 @@ class VideoAttachment : MsgAttachment {
     override fun getMsgType(): Int = MsgType.VIDEO
 
     override fun toJson(send: Boolean): String = JSONObject().apply {
-        // Local fields are sent temporarily until a file upload service is connected.
-        put("localPath", localPath)
+        if (!send) put("localPath", localPath)
         put("remoteUrl", remoteUrl)
-        put("localCoverPath", localCoverPath)
+        if (!send) put("localCoverPath", localCoverPath)
         put("remoteCoverUrl", remoteCoverUrl)
         put("duration", duration)
         put("width", width)

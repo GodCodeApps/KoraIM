@@ -11,6 +11,7 @@ import com.kora.imcore.db.Message
 import com.kora.imcore.db.UserInfo
 import com.kora.imcore.provider.IMUserInfoProvider
 import com.kora.imui.ImUIKitImpl
+import com.kora.imui.IMMediaMessageSender
 import com.kora.imui.listener.sessionEventListener
 import kotlinx.coroutines.launch
 
@@ -36,6 +37,7 @@ class MainActivity : AppCompatActivity() {
     private fun initializeClient(account: String) {
         ImSdkImpl.setAccount(account)
         IMClient.init(applicationContext, SERVER_HOST, SERVER_PORT)
+        ImUIKitImpl.setMediaMessageProvider(AppMediaMessageProvider())
         IMClient.userInfoProvider = object : IMUserInfoProvider {
             override fun getUserInfo(account: String): UserInfo? = DemoUsers.info(account)
             override fun fetchUserInfoFromServer(account: String, callback: (UserInfo?) -> Unit) {
@@ -57,8 +59,14 @@ class MainActivity : AppCompatActivity() {
             onAvatarClickListener { Toast.makeText(this@MainActivity, it, Toast.LENGTH_SHORT).show() }
             onResendClickListener { message ->
                 (message as? Message)?.let {
-                    it.status = MsgStatus.SENDING
-                    lifecycleScope.launch { IMClient.sendMessage(it) }
+                    lifecycleScope.launch {
+                        if (IMMediaMessageSender.isMedia(it)) {
+                            IMMediaMessageSender.send(it)
+                        } else {
+                            it.status = MsgStatus.SENDING
+                            IMClient.sendMessage(it)
+                        }
+                    }
                 }
             }
         })

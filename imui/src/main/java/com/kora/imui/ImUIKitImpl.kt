@@ -1,6 +1,7 @@
 package com.kora.imui
 
 import com.kora.imui.listener.SessionEventListener
+import com.kora.imui.provider.IMMediaMessageProvider
 
 /**
  * Copyright 2026 GodCodeApps
@@ -10,8 +11,14 @@ import com.kora.imui.listener.SessionEventListener
  */
 object ImUIKitImpl {
     private var sessionEventListener: SessionEventListener? = null
+    private var mediaMessageProvider: IMMediaMessageProvider? = null
     fun getSessionListener(): SessionEventListener? = sessionEventListener
+    //聊天点击事件
     fun setSessionEventListener(listener: SessionEventListener?) {
         sessionEventListener = listener
     }
+    fun setMediaMessageProvider(provider: IMMediaMessageProvider?) {
+        mediaMessageProvider = provider
+    }
+    fun getMediaMessageProvider(): IMMediaMessageProvider? = mediaMessageProvider
 }

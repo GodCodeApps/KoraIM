@@ -66,7 +66,9 @@ object MessageBuilder {
         receiverId: String = sessionId,
         localPath: String = "",
         mWidth: Int = 0,
-        mHeight: Int = 0
+        mHeight: Int = 0,
+        size: Long = 0L,
+        mimeType: String = ""
     ): IMMessage {
         return Message(
             sessionId = sessionId,
@@ -78,10 +80,12 @@ object MessageBuilder {
             receiverId = receiverId,
             time = System.currentTimeMillis(),
             attachment = ImageAttachment().apply {
-                path = localPath
+                this.localPath = localPath
                 width = mWidth
                 height = mHeight
-            }.toJson(true)
+                this.size = size
+                this.mimeType = mimeType
+            }.toJson(false)
         )
     }
 }

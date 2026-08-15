@@ -10,9 +10,13 @@ import com.kora.imcore.impl.IMMessage
  * @Description:
  */
 open class SessionEventListener {
+    //聊天头像点击
     private var onAvatarClickListener: ((account: String?) -> Unit)? = null
+    //聊天头像长按
     private var onAvatarLongClickListener: ((account: String?) -> Unit)? = null
+    //聊天消息点击
     private var onItemClickListener: ((message: IMMessage?) -> Unit)? = null
+    //聊天消息失败重发点击
     private var onResendClickListener: ((message: IMMessage?) -> Unit)? = null
     fun onAvatarClickListener(avatarClickListener: ((account: String?) -> Unit)?) {
         this.onAvatarClickListener = avatarClickListener

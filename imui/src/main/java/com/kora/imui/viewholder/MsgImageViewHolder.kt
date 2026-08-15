@@ -6,6 +6,7 @@ import com.bumptech.glide.Glide
 import com.kora.imcore.impl.IMMessage
 import com.kora.imui.R
 import com.kora.imui.attachment.ImageAttachment
+import java.io.File
 
 /**
  * Copyright 2026 GodCodeApps
@@ -36,8 +37,11 @@ class MsgImageViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
         layoutParams.width = mWidth
         layoutParams.height = mHeight
         imageView.layoutParams = layoutParams
+        val localPath = attachment.localPath
+        val source = localPath.takeIf { it.isNotBlank() && File(it).isFile }
+            ?: attachment.remoteUrl
         Glide.with(imageView)
-            .load(attachment.path)
+            .load(source)
             .placeholder(R.drawable.bg_media_placeholder)
             .error(R.drawable.media_error_placeholder)
             .override(mWidth, mHeight)

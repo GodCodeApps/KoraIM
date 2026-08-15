@@ -12,9 +12,12 @@ import org.json.JSONObject
  * @Description:
  */
 class ImageAttachment : MsgAttachment {
-    var path: String = ""
+    var localPath: String = ""
+    var remoteUrl: String = ""
     var width: Int = 0
     var height: Int = 0
+    var size: Long = 0L
+    var mimeType: String = ""
 
     constructor()
     constructor(attach: String) {
@@ -28,9 +31,12 @@ class ImageAttachment : MsgAttachment {
     override fun toJson(send: Boolean): String {
         val jsonObject = JSONObject()
         try {
-            jsonObject.put("path", path)
+            if (!send) jsonObject.put("localPath", localPath)
+            jsonObject.put("remoteUrl", remoteUrl)
             jsonObject.put("width", width)
             jsonObject.put("height", height)
+            jsonObject.put("size", size)
+            jsonObject.put("mimeType", mimeType)
         } catch (e: JSONException) {
         }
         return jsonObject.toString()
@@ -39,9 +45,12 @@ class ImageAttachment : MsgAttachment {
     private fun fromJson(attach: String) {
         try {
             val jsonObject = JSONObject(attach)
-            path = jsonObject.getString("path")
-            width = jsonObject.getInt("width")
-            height = jsonObject.getInt("height")
+            localPath = jsonObject.optString("localPath", jsonObject.optString("path"))
+            remoteUrl = jsonObject.optString("remoteUrl")
+            width = jsonObject.optInt("width")
+            height = jsonObject.optInt("height")
+            size = jsonObject.optLong("size")
+            mimeType = jsonObject.optString("mimeType")
         } catch (e: JSONException) {
         }
     }

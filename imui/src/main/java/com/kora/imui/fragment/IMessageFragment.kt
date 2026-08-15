@@ -73,6 +73,20 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
             .setSessionType(sessionType)
             .build(this,view, messageListPanelEx = messageListPanelEx!!)
 
+        // Clear existing unread messages no matter whether this page was opened from
+        // the conversation list, a notification, or a user profile.
+        viewLifecycleOwner.lifecycleScope.launch {
+            if (currentSessionId.isBlank() && peerId.isNotBlank()) {
+                IMClient.getP2PConversation(peerId)?.let { conversation ->
+                    currentSessionId = conversation.sessionId
+                    inputPanel?.updateSessionId(currentSessionId)
+                }
+            }
+            if (currentSessionId.isNotBlank()) {
+                IMClient.markConversationRead(currentSessionId)
+            }
+        }
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 IMClient.messageUpdates.collect { message ->

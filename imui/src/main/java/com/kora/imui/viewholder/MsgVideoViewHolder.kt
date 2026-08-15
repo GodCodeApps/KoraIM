@@ -12,6 +12,7 @@ import com.bumptech.glide.Glide
 import com.kora.imcore.impl.IMMessage
 import com.kora.imui.R
 import com.kora.imui.attachment.VideoAttachment
+import java.io.File
 
 class MsgVideoViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
     private val attachment get() = mMessage?.getAttachment() as VideoAttachment
@@ -22,10 +23,12 @@ class MsgVideoViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
         val cover = view.findViewById<ImageView>(R.id.iv_video_cover)
         val container = view.findViewById<View>(R.id.video_container)
         val duration = view.findViewById<TextView>(R.id.tv_video_duration)
-        val source = attachment.remoteUrl.ifBlank { attachment.localPath }
-        val coverSource = attachment.remoteCoverUrl.ifBlank {
-            attachment.localCoverPath.ifBlank { source }
-        }
+        val source = attachment.localPath
+            .takeIf { it.isNotBlank() && File(it).isFile }
+            ?: attachment.remoteUrl
+        val coverSource = attachment.localCoverPath
+            .takeIf { it.isNotBlank() && File(it).isFile }
+            ?: attachment.remoteCoverUrl.ifBlank { source }
         val density = view.resources.displayMetrics.density
         val maxWidth = (240 * density).toInt()
         val maxHeight = (240 * density).toInt()

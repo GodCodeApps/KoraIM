@@ -21,6 +21,7 @@ import com.kora.imcore.constant.MsgDirection
 import com.kora.imcore.constant.MsgType
 import com.kora.imcore.impl.IMMessage
 import com.kora.imui.ImUIKitImpl
+import com.kora.imui.IMMediaMessageSender
 import com.kora.imui.R
 import com.kora.imui.utils.TimeFormatUtils
 import com.kora.imcore.constant.MsgStatus
@@ -108,7 +109,21 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
             setGravity(llBody, Gravity.RIGHT)
             setMsgStatus(progress, ivMsgStatus)
             ivMsgStatus.setOnClickListener {
-                ImUIKitImpl.getSessionListener()?.getResendClickListener()?.invoke(mMessage)
+                val message = mMessage ?: return@setOnClickListener
+                if (message.getMsgStatus() != MsgStatus.FAIL) return@setOnClickListener
+                val customResend = ImUIKitImpl.getSessionListener()?.getResendClickListener()
+                if (customResend != null) {
+                    customResend.invoke(message)
+                } else {
+                    itemView.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
+                        if (IMMediaMessageSender.isMedia(message.getMessage())) {
+                            IMMediaMessageSender.enqueue(message.getMessage())
+                        } else {
+                            message.setMsgStatus(MsgStatus.SENDING)
+                            IMClient.sendMessage(message)
+                        }
+                    }
+                }
             }
         }
 

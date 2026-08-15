@@ -19,6 +19,13 @@ import com.kora.imcore.repository.UserRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import com.kora.imcore.listener.UnreadCountListener
+import com.kora.imcore.listener.UnreadCountSubscription
 
 /** Public SDK facade. Transport, persistence and caches live in dedicated components. */
 object IMClient {
@@ -87,6 +94,31 @@ object IMClient {
     fun observeConversations(): Flow<List<Conversation>> {
         ensureInitialized()
         return conversationDao.observeAll(IMRuntime.ownerId)
+    }
+
+    /** Database-backed total unread count for the current account. Emits immediately and on changes. */
+    fun observeTotalUnreadCount(): Flow<Int> {
+        ensureInitialized()
+        return conversationDao.observeAll(IMRuntime.ownerId)
+            .map { conversations ->
+                conversations.fold(0L) { total, item -> total + item.unreadCount }
+                    .coerceAtMost(Int.MAX_VALUE.toLong())
+                    .toInt()
+            }
+            .distinctUntilChanged()
+    }
+
+    /** Java-friendly observer. Call cancel() when the host no longer needs badge updates. */
+    fun addUnreadCountListener(listener: UnreadCountListener): UnreadCountSubscription {
+        ensureInitialized()
+        val job = IMRuntime.scope.launch {
+            observeTotalUnreadCount().collect { count ->
+                withContext(Dispatchers.Main.immediate) {
+                    listener.onUnreadCountChanged(count)
+                }
+            }
+        }
+        return UnreadCountSubscription { job.cancel() }
     }
 
     suspend fun markConversationRead(sessionId: String) {
