@@ -1,5 +1,6 @@
 package com.kora.im
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -8,11 +9,18 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.fragment.app.Fragment
+import com.kora.im.chat.ChatActivity
+import com.kora.im.chat.MessageFragment
+import com.kora.imcore.constant.SessionType
 
 class UserListFragment : Fragment() {
     private val currentAccount get() = requireArguments().getString(ARG_ACCOUNT).orEmpty()
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View =
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        state: Bundle?
+    ): View =
         inflater.inflate(R.layout.fragment_user_list, container, false)
 
     override fun onViewCreated(view: View, state: Bundle?) {
@@ -23,12 +31,17 @@ class UserListFragment : Fragment() {
             list.addView(Button(requireContext()).apply {
                 text = "与 ${DemoUsers.info(account)?.nickname} 单聊"
                 isAllCaps = false
-                setOnClickListener { (activity as MainActivity).openChat(account) }
+                setOnClickListener {
+                    val intent: Intent = Intent(activity, ChatActivity::class.java)
+                    intent.putExtra("session_type", SessionType.P2P)
+                    intent.putExtra("peer_id", account)
+                    startActivity(intent)
+                }
             })
         }
         if (childFragmentManager.findFragmentById(R.id.conversation_fragment_container) == null) {
             childFragmentManager.beginTransaction()
-                .replace(R.id.conversation_fragment_container, DemoConversationListFragment())
+                .replace(R.id.conversation_fragment_container, MessageFragment())
                 .commit()
         }
     }

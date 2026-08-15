@@ -1,5 +1,6 @@
 package com.kora.imui.viewholder
 
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -13,6 +14,8 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.resource.bitmap.CenterCrop
+import com.bumptech.glide.load.resource.bitmap.RoundedCorners
 import com.kora.imcore.IMClient
 import com.kora.imcore.constant.MsgDirection
 import com.kora.imcore.constant.MsgType
@@ -56,7 +59,7 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
         var flMsgStatus = itemView.findViewById<FrameLayout>(R.id.fl_msg_status)
         var progress = itemView.findViewById<ProgressBar>(R.id.progress)
         var ivMsgStatus = itemView.findViewById<AppCompatImageView>(R.id.iv_msg_status)
-        
+
         // 仿微信时间显示逻辑 (间隔大于5分钟显示)
         val currTime = mMessage?.getMsgTime() ?: 0L
         if (prevMessage == null) {
@@ -65,19 +68,20 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
         } else {
             val prevTime = prevMessage.getMsgTime()
 //            if (currTime - prevTime > 5 * 60 * 1000) {
-                tvTime?.visibility = View.VISIBLE
-                tvTime?.text = TimeFormatUtils.formatWeChatTime(currTime)
+            tvTime?.visibility = View.VISIBLE
+            tvTime?.text = TimeFormatUtils.formatWeChatTime(currTime)
 //            } else {
 //                tvTime?.visibility = View.GONE
 //            }
         }
-        
+
         if (isMiddleItem()) {
             leftAvatar?.visibility = View.GONE
             rightAvatar?.visibility = View.GONE
             return
         }
-        val isMedia = mMessage?.getMsgType() == MsgType.IMAGE || mMessage?.getMsgType() == MsgType.VIDEO
+        val isMedia =
+            mMessage?.getMsgType() == MsgType.IMAGE || mMessage?.getMsgType() == MsgType.VIDEO
         if (isReceivedMsg()) {
             leftAvatar?.visibility = View.VISIBLE
             rightAvatar?.visibility = View.GONE
@@ -98,7 +102,8 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                 contentContainer?.backgroundTintList = null
             } else {
                 contentContainer?.setBackgroundResource(R.drawable.im_msg_right_bg)
-                contentContainer?.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#95EC69")) // 微信绿
+                contentContainer?.backgroundTintList =
+                    android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#95EC69")) // 微信绿
             }
             setGravity(llBody, Gravity.RIGHT)
             setMsgStatus(progress, ivMsgStatus)
@@ -106,44 +111,46 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                 ImUIKitImpl.getSessionListener()?.getResendClickListener()?.invoke(mMessage)
             }
         }
-        
+
         // 统一处理头像加载与默认头像兜底
         val account = mMessage?.senderId
         val defaultAvatarRes = R.drawable.ic_default_avatar
         val targetAvatarView = if (isReceivedMsg()) leftAvatar else rightAvatar
-        
+
         // 1. 列表复用时，先立刻展示默认头像，防止头像错乱闪烁
         targetAvatarView?.let { imageView ->
             Glide.with(itemView.context)
                 .load(defaultAvatarRes)
-                .transform(com.bumptech.glide.load.resource.bitmap.RoundedCorners(16))
+                .circleCrop()
                 .into(imageView)
         }
-
         // 2. 异步/同步获取用户信息
         val boundMessageId = mMessage?.getMsgId()
-        itemView.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
-            val userInfo = IMClient.getUserInfo(account)
-            if (mMessage?.getMsgId() != boundMessageId) return@launch
-            val avatarUrl = userInfo?.avatar
-            targetAvatarView?.let { imageView ->
-                if (!avatarUrl.isNullOrEmpty()) {
-                    // 使用 Glide 加载网络或本地路径头像，带有占位图和错误图
-                    Glide.with(itemView.context)
-                        .load(avatarUrl)
-                        .placeholder(defaultAvatarRes)
-                        .error(defaultAvatarRes)
-                        .transform(com.bumptech.glide.load.resource.bitmap.RoundedCorners(16))
-                        .into(imageView)
-                } else {
-                    // 明确没有头像数据，确保展示默认头像
-                    Glide.with(itemView.context)
-                        .load(defaultAvatarRes)
-                        .transform(com.bumptech.glide.load.resource.bitmap.RoundedCorners(16))
-                        .into(imageView)
+        itemView.post {
+            val launch = itemView.findViewTreeLifecycleOwner()
+            launch?.lifecycleScope?.launch {
+                val userInfo = IMClient.getUserInfo(account)
+                if (mMessage?.getMsgId() != boundMessageId) return@launch
+                val avatarUrl = userInfo?.avatar
+                targetAvatarView?.let { imageView ->
+                    if (!avatarUrl.isNullOrEmpty()) {
+                        // 使用 Glide 加载网络或本地路径头像，带有占位图和错误图
+                        Glide.with(itemView.context)
+                            .load(avatarUrl)
+                            .placeholder(defaultAvatarRes)
+                            .error(defaultAvatarRes)
+                            .circleCrop()
+                            .into(imageView)
+                    } else {
+                        // 明确没有头像数据，确保展示默认头像
+                        Glide.with(itemView.context)
+                            .load(defaultAvatarRes)
+                            .into(imageView)
+                    }
                 }
             }
         }
+
         contentContainer?.setOnClickListener {
             ImUIKitImpl.getSessionListener()?.getItemClickListener()?.invoke(
                 mMessage
@@ -179,10 +186,12 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                 progressBar.visibility = View.VISIBLE
                 imageView.visibility = View.GONE
             }
+
             MsgStatus.SUCCESS -> {
                 progressBar.visibility = View.GONE
                 imageView.visibility = View.GONE
             }
+
             MsgStatus.FAIL -> {
                 progressBar.visibility = View.GONE
                 imageView.visibility = View.VISIBLE
@@ -193,12 +202,12 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
     private fun setGravity(viewGroup: ViewGroup, gravity: Int) {
         val params = viewGroup.layoutParams as FrameLayout.LayoutParams
         params.gravity = gravity
-        if (gravity== Gravity.LEFT){
-            params.marginEnd=50
-            params.marginStart=0
-        }else{
-            params.marginEnd=0
-            params.marginStart=50
+        if (gravity == Gravity.LEFT) {
+            params.marginEnd = 50
+            params.marginStart = 0
+        } else {
+            params.marginEnd = 0
+            params.marginStart = 50
 
         }
         viewGroup.layoutParams = params

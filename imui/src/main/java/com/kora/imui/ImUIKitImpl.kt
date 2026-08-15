@@ -9,12 +9,7 @@ import com.kora.imui.listener.SessionEventListener
  * @Description:
  */
 object ImUIKitImpl {
-    private var mAccount: String? = null
     private var sessionEventListener: SessionEventListener? = null
-    fun setAccount(account: String?) {
-        mAccount = account
-    }
-    fun getAccount(): String? = mAccount
     fun getSessionListener(): SessionEventListener? = sessionEventListener
     fun setSessionEventListener(listener: SessionEventListener?) {
         sessionEventListener = listener

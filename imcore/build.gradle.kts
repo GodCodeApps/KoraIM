@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.library)
-//    id("org.jetbrains.kotlin.kapt")
 }
 
 android {
@@ -22,16 +21,7 @@ android {
 }
 
 dependencies {
-    implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.material)
     implementation(libs.netty)
     implementation(libs.gson)
     implementation(libs.livedataKtx)
-
-
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.junit)
-
 }

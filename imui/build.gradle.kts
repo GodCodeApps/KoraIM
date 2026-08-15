@@ -23,30 +23,12 @@ android {
 }
 
 dependencies {
-    implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.material)
+//    implementation(libs.androidx.appcompat)
+//    implementation(libs.androidx.core.ktx)
+//    implementation(libs.material)
     implementation(libs.lifecycle.runtime.ktx)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.junit)
-    api(project(":imcore"))
     implementation(libs.refreshLayout)
     implementation(libs.glide)
     implementation(libs.pictureselector)
-
-
-
-//
-//            implementation Dependencies.recyclerview
-//            implementation Dependencies.constraintLayout
-//            implementation Dependencies.album
-////    kapt Dependencies.roomCompiler
-////    implementation Dependencies.roomKtx
-////    implementation Dependencies.livedataKtx
-//            api project(':components:imCore')
-//
-//    implementation Dependencies.network
-//            implementation Dependencies.uploader
-//            implementation Dependencies.imageLoader
+    api(project(":imcore"))
 }

@@ -1,6 +1,7 @@
 # KoraIM
 
 KoraIM 是由 GodCodeApps 开源的 Android IM 客户端框架。项目目前处于早期预览阶段，包含核心通信与本地存储模块、聊天 UI Kit，以及用于本地联调的 Node.js TCP 服务端。
+- `🚀 让任何 Android 项目在 5 分钟内快速接入聊天功能
 
 ## 模块
 
@@ -48,7 +49,6 @@ KoraIM 是由 GodCodeApps 开源的 Android IM 客户端框架。项目目前处
 
 - 示例服务器仅用于本地开发，不包含账号鉴权、持久化和消息路由。
 - 暂未发布 Maven Central 坐标。
-- API 在 `1.0.0` 之前可能发生不兼容变更。
 
 ## 构建检查
 

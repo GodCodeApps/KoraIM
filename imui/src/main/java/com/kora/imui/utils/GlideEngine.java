@@ -9,11 +9,6 @@ import com.bumptech.glide.load.resource.bitmap.RoundedCorners;
 import com.luck.picture.lib.engine.ImageEngine;
 import com.luck.picture.lib.utils.ActivityCompatHelper;
 
-/**
- * @author：luck
- * @date：2019-11-13 17:02
- * @describe：Glide加载引擎
- */
 // 图片选择器使用的 Glide 加载引擎
 public class GlideEngine implements ImageEngine {
 

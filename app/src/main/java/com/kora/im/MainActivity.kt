@@ -35,7 +35,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun initializeClient(account: String) {
         ImSdkImpl.setAccount(account)
-        ImUIKitImpl.setAccount(account)
         IMClient.init(applicationContext, SERVER_HOST, SERVER_PORT)
         IMClient.userInfoProvider = object : IMUserInfoProvider {
             override fun getUserInfo(account: String): UserInfo? = DemoUsers.info(account)
@@ -45,12 +44,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun openChat(account: String) {
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, P2PMessageFragment.newInstance(account))
-            .addToBackStack(null)
-            .commit()
-    }
 
     private fun showLogin() {
         IMClient.release()
