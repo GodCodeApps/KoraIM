@@ -141,6 +141,11 @@ object IMClient {
         messageRepository.upsert(message.getMessage())
     }
 
+    suspend fun getMessageById(messageId: String): Message? = withContext(Dispatchers.IO) {
+        ensureInitialized()
+        messageRepository.getMessageById(messageId)
+    }
+
     suspend fun saveMessages(messages: List<Message>) {
         ensureInitialized()
         messageRepository.upsertAll(messages)

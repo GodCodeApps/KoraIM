@@ -75,6 +75,26 @@ object MessageBuilder {
         )
     }
 
+    fun createTipMessage(
+        sessionId: String,
+        @SessionType sessionType: Int = SessionType.None,
+        receiverId: String = sessionId,
+        msg: String = "",
+        @MsgDirection msgDirect: Int = MsgDirection.IN
+    ): IMMessage {
+        return Message(
+            sessionId = sessionId,
+            sessionType = sessionType,
+            type = MsgType.TIP,
+            direct = msgDirect,
+            status = MsgStatus.SUCCESS,
+            senderId = ImSdkImpl.getAccount() ?: "",
+            receiverId = receiverId,
+            time = System.currentTimeMillis(),
+            attachment = com.kora.imui.attachment.TipAttachment().apply { content = msg }.toJson(false)
+        )
+    }
+
     fun createImageMessage(
         sessionId: String,
         @SessionType sessionType: Int = SessionType.None,

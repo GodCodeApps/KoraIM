@@ -88,7 +88,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         // Development machine's WLAN address. The phone and computer must be on
         // the same LAN; update this value if the computer's DHCP address changes.
-        private const val SERVER_HOST = "192.168.1.5"
+        private const val SERVER_HOST = "192.168.1.9"
         private const val SERVER_PORT = 8090
         private const val STATE_ACCOUNT = "current_account"
     }

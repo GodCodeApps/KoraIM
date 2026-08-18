@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="300dp"
+    android:layout_height="420dp"
+    android:background="@drawable/bg_red_packet_dialog">
+
+    <ImageView
+        android:id="@+id/iv_close"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="top|start"
+        android:padding="12dp"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        android:tint="#80000000" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingTop="50dp">
+
+        <!-- Avatar Placeholder -->
+        <ImageView
+            android:id="@+id/iv_avatar"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:background="#FFFFFFFF"
+            android:src="@drawable/ic_red_packet_message" />
+
+        <TextView
+            android:id="@+id/tv_sender_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="发红包的人的红包"
+            android:textColor="#FFFFE1B3"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/tv_greeting"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="恭喜发财，大吉大利"
+            android:textColor="#FFFFE1B3"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/fl_open_btn_container"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="60dp">
+
+        <TextView
+            android:id="@+id/btn_open"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_red_packet_open_btn"
+            android:gravity="center"
+            android:text="開"
+            android:textColor="#FF333333"
+            android:textSize="40sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+</FrameLayout>

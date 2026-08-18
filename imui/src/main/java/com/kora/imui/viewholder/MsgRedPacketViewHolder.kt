@@ -7,6 +7,9 @@ import com.kora.imcore.impl.IMMessage
 import com.kora.imui.R
 import com.kora.imui.attachment.RedPacketAttachment
 import java.util.Locale
+import androidx.lifecycle.findViewTreeLifecycleOwner
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class MsgRedPacketViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
     private val attachment: RedPacketAttachment
@@ -22,14 +25,51 @@ class MsgRedPacketViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
             RedPacketAttachment.STATE_EXPIRED -> "红包已过期"
             else -> "微信红包"
         }
-        view.alpha = if (packet.state == RedPacketAttachment.STATE_UNCLAIMED) 1f else 0.65f
-        view.setOnClickListener {
-            val amount = String.format(Locale.CHINA, "%.2f", packet.amountFen / 100.0)
-            AlertDialog.Builder(view.context)
-                .setTitle(packet.greeting)
-                .setMessage("¥ $amount\n\n当前为红包消息展示，未接入真实支付和领取接口。")
-                .setPositiveButton("知道了", null)
-                .show()
+        
+        val maskView = view.findViewById<View>(R.id.v_red_packet_mask)
+        if (packet.state == RedPacketAttachment.STATE_UNCLAIMED) {
+            maskView?.visibility = View.GONE
+            view.alpha = 1f
+            view.setOnClickListener {
+                if (message.getMsgDirection() == com.kora.imcore.constant.MsgDirection.OUT) {
+                    android.widget.Toast.makeText(view.context, "自己发的红包自己不能拆", android.widget.Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                
+                val dialog = com.kora.imui.widget.RedPacketOpenDialog(
+                    view.context,
+                    packet,
+                    "好友"
+                ) {
+                    // Update state to received and refresh the UI
+                    packet.state = RedPacketAttachment.STATE_RECEIVED
+                    message.getMessage().attachment = packet.toJson(message.getMsgDirection() == com.kora.imcore.constant.MsgDirection.OUT)
+                    bindViewHolder(view, message)
+                    
+                    view.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
+                        com.kora.imcore.IMClient.saveMessage(message)
+                        
+                        // Send remote tip message to the sender so they know who opened it
+                        val remoteTipMsg = com.kora.imui.MessageBuilder.createTipMessage(
+                            message.getIMSessionId(),
+                            message.getIMSessionType(),
+                            message.senderId, // We send back to the original sender
+                            "好友领取了你的红包", // This is what the sender will see
+                            com.kora.imcore.constant.MsgDirection.OUT
+                        )
+                        val tipAttachment = remoteTipMsg.getAttachment() as com.kora.imui.attachment.TipAttachment
+                        tipAttachment.redPacketMsgId = message.getMsgId()
+                        remoteTipMsg.getMessage().attachment = tipAttachment.toJson(true)
+                        
+                        com.kora.imcore.IMClient.sendMessage(remoteTipMsg)
+                    }
+                }
+                dialog.show()
+            }
+        } else {
+            maskView?.visibility = View.VISIBLE
+            view.alpha = 0.65f
+            view.setOnClickListener(null) // Disable click completely if already claimed/expired
         }
     }
 }

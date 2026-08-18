@@ -107,6 +107,22 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
                     val belongsHere = message.sessionId == currentSessionId ||
                         (currentSessionId.isBlank() && message.getIMSessionType() == SessionType.P2P && message.senderId == peerId)
                     if (belongsHere) IMClient.markConversationRead(message.sessionId)
+                    
+                    if (message.getMsgType() == com.kora.imcore.constant.MsgType.TIP) {
+                        val attachment = message.getAttachment() as? com.kora.imui.attachment.TipAttachment
+                        val rpId = attachment?.redPacketMsgId
+                        if (!rpId.isNullOrEmpty()) {
+                            val rpMsg = IMClient.getMessageById(rpId)
+                            if (rpMsg != null) {
+                                val rpAtt = rpMsg.getAttachment() as? com.kora.imui.attachment.RedPacketAttachment
+                                if (rpAtt != null && rpAtt.state != com.kora.imui.attachment.RedPacketAttachment.STATE_RECEIVED) {
+                                    rpAtt.state = com.kora.imui.attachment.RedPacketAttachment.STATE_RECEIVED
+                                    rpMsg.attachment = rpAtt.toJson(rpMsg.getMsgDirection() == com.kora.imcore.constant.MsgDirection.OUT)
+                                    IMClient.saveMessage(rpMsg)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

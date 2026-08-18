@@ -23,4 +23,6 @@ internal class MessageRepository(private val dao: MessageDao) {
     suspend fun confirm(message: Message, ownerId: String) = dao.confirmMessage(message, ownerId)
     suspend fun applySync(ownerId: String, events: List<SyncEvent>, cursor: Long) =
         dao.applySync(ownerId, events, cursor)
+
+    fun getMessageById(messageId: String): Message? = dao.getMessageByMessageId(messageId)
 }

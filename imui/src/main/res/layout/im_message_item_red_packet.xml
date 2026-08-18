@@ -1,45 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="235dp"
-    android:layout_height="wrap_content"
-    android:background="@drawable/bg_red_packet_card"
-    android:orientation="vertical">
+    android:layout_height="wrap_content">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="76dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingEnd="14dp">
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_red_packet_card"
+        android:orientation="vertical">
 
-        <ImageView
-            android:layout_width="44dp"
-            android:layout_height="50dp"
-            android:contentDescription="红包"
-            android:src="@drawable/ic_red_packet_message" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="76dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="14dp">
+
+            <ImageView
+                android:layout_width="44dp"
+                android:layout_height="50dp"
+                android:contentDescription="红包"
+                android:src="@drawable/ic_red_packet_message" />
+
+            <TextView
+                android:id="@+id/tv_red_packet_greeting"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:text="恭喜发财，大吉大利"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp" />
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/tv_red_packet_greeting"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="2"
-            android:text="恭喜发财，大吉大利"
-            android:textColor="#FFFFFFFF"
-            android:textSize="16sp" />
+            android:id="@+id/tv_red_packet_state"
+            android:layout_width="match_parent"
+            android:layout_height="30dp"
+            android:background="@drawable/bg_red_packet_bottom"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:text="微信红包"
+            android:textColor="#FF999999"
+            android:textSize="11sp" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/tv_red_packet_state"
+    <View
+        android:id="@+id/v_red_packet_mask"
         android:layout_width="match_parent"
-        android:layout_height="30dp"
-        android:background="#FFFFFFFF"
-        android:gravity="center_vertical"
-        android:paddingStart="12dp"
-        android:text="微信红包"
-        android:textColor="#FF999999"
-        android:textSize="11sp" />
-</LinearLayout>
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_red_packet_card"
+        android:backgroundTint="#80FFFFFF"
+        android:visibility="gone" />
+
+</FrameLayout>

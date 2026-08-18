@@ -79,6 +79,17 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
         if (isMiddleItem()) {
             leftAvatar?.visibility = View.GONE
             rightAvatar?.visibility = View.GONE
+            flMsgStatus?.visibility = View.GONE
+            contentContainer?.setBackgroundResource(0)
+            contentContainer?.backgroundTintList = null
+            contentContainer?.setPadding(0, 0, 0, 0)
+            if (llBody != null) {
+                val params = llBody.layoutParams as FrameLayout.LayoutParams
+                params.gravity = Gravity.CENTER_HORIZONTAL
+                params.marginStart = 0
+                params.marginEnd = 0
+                llBody.layoutParams = params
+            }
             return
         }
         val isMedia = mMessage?.getMsgType() == MsgType.IMAGE ||
