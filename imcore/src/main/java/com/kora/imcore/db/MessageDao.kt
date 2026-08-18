@@ -38,6 +38,7 @@ class MessageDao(
             MsgType.IMAGE -> "[图片]"
             MsgType.VIDEO -> "[视频]"
             MsgType.VOICE -> "[语音]"
+            MsgType.RED_PACKET -> "[红包]"
             MsgType.TIP -> "[提示消息]"
             else -> "[消息]"
         },

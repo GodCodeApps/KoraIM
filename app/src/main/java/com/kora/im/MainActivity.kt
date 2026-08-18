@@ -12,7 +12,8 @@ import com.kora.imcore.db.UserInfo
 import com.kora.imcore.provider.IMUserInfoProvider
 import com.kora.imui.ImUIKitImpl
 import com.kora.imui.IMMediaMessageSender
-import com.kora.imui.listener.sessionEventListener
+import com.kora.imui.listener.SessionEventListener
+import com.kora.imcore.impl.IMMessage
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -55,9 +56,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun configureMessageActions() {
-        ImUIKitImpl.setSessionEventListener(sessionEventListener {
-            onAvatarClickListener { Toast.makeText(this@MainActivity, it, Toast.LENGTH_SHORT).show() }
-            onResendClickListener { message ->
+        ImUIKitImpl.setSessionEventListener(SessionEventListener().apply {
+            onAvatarClickListener { account: String? ->
+                Toast.makeText(this@MainActivity, account.orEmpty(), Toast.LENGTH_SHORT).show()
+            }
+            onResendClickListener { message: IMMessage? ->
                 (message as? Message)?.let {
                     lifecycleScope.launch {
                         if (IMMediaMessageSender.isMedia(it)) {

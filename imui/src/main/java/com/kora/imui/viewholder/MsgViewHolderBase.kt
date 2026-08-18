@@ -81,8 +81,9 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
             rightAvatar?.visibility = View.GONE
             return
         }
-        val isMedia =
-            mMessage?.getMsgType() == MsgType.IMAGE || mMessage?.getMsgType() == MsgType.VIDEO
+        val isMedia = mMessage?.getMsgType() == MsgType.IMAGE ||
+            mMessage?.getMsgType() == MsgType.VIDEO ||
+            mMessage?.getMsgType() == MsgType.RED_PACKET
         if (isReceivedMsg()) {
             leftAvatar?.visibility = View.VISIBLE
             rightAvatar?.visibility = View.GONE

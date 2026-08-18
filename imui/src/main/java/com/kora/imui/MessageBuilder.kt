@@ -9,6 +9,7 @@ import com.kora.imcore.impl.IMMessage
 import com.kora.imui.attachment.ImageAttachment
 import com.kora.imui.attachment.TextAttachment
 import com.kora.imui.attachment.VideoAttachment
+import com.kora.imui.attachment.RedPacketAttachment
 import com.kora.imcore.constant.MsgStatus
 
 /**
@@ -18,6 +19,23 @@ import com.kora.imcore.constant.MsgStatus
  * @Description:构建消息实例
  */
 object MessageBuilder {
+    fun createRedPacketMessage(
+        sessionId: String,
+        @SessionType sessionType: Int,
+        receiverId: String,
+        attachment: RedPacketAttachment
+    ): IMMessage = Message(
+        sessionId = sessionId,
+        sessionType = sessionType,
+        senderId = ImSdkImpl.getAccount() ?: "",
+        receiverId = receiverId,
+        type = MsgType.RED_PACKET,
+        direct = MsgDirection.OUT,
+        status = MsgStatus.SENDING,
+        time = System.currentTimeMillis(),
+        attachment = attachment.toJson(true)
+    )
+
     fun createVideoMessage(
         sessionId: String,
         @SessionType sessionType: Int,

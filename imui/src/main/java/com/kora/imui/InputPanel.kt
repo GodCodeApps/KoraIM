@@ -15,6 +15,7 @@ import com.kora.imui.MessageListPanelEx
 import com.kora.imui.R
 import com.kora.imui.attachment.VoiceAttachment
 import com.kora.imui.attachment.VideoAttachment
+import com.kora.imui.attachment.RedPacketAttachment
 import com.kora.imui.bean.BaseInputAction
 import com.kora.imui.inputbox.ChatInputView
 import com.kora.imui.inputbox.ChatInputView.OnInputListener
@@ -206,6 +207,9 @@ class InputPanel(
                             }
                         })
                     return
+                } else if (optionName.equals("红包")) {
+                    showRedPacketDialog()
+                    return
                 }
 
 
@@ -285,6 +289,62 @@ class InputPanel(
             }
         })
 
+    }
+
+    private fun showRedPacketDialog() {
+        val context = fragment.context ?: return
+        val content = android.view.LayoutInflater.from(context)
+            .inflate(R.layout.dialog_send_red_packet, null, false)
+        val amountInput = content.findViewById<android.widget.EditText>(R.id.et_red_packet_amount)
+        val greetingInput = content.findViewById<android.widget.EditText>(R.id.et_red_packet_greeting)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(context)
+            .setTitle("发红包")
+            .setView(content)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("塞钱进红包", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).apply {
+                setTextColor(android.graphics.Color.parseColor("#D94E3F"))
+                setOnClickListener {
+                    val amount = runCatching {
+                        java.math.BigDecimal(amountInput.text.toString().trim())
+                    }.getOrNull()
+                    if (amount == null || amount <= java.math.BigDecimal.ZERO) {
+                        amountInput.error = "请输入正确的金额"
+                        return@setOnClickListener
+                    }
+                    if (amount > java.math.BigDecimal("200")) {
+                        amountInput.error = "单个红包不能超过200元"
+                        return@setOnClickListener
+                    }
+                    if (amount.scale() > 2) {
+                        amountInput.error = "金额最多保留两位小数"
+                        return@setOnClickListener
+                    }
+                    val amountFen = amount.movePointRight(2).longValueExact()
+                    val greeting = greetingInput.text.toString().trim()
+                        .ifBlank { RedPacketAttachment.DEFAULT_GREETING }
+                    val attachment = RedPacketAttachment().apply {
+                        packetId = java.util.UUID.randomUUID().toString()
+                        this.amountFen = amountFen
+                        this.greeting = greeting
+                    }
+                    val message = MessageBuilder.createRedPacketMessage(
+                        sessionId = sessionId,
+                        sessionType = sessionType,
+                        receiverId = peerId.ifBlank { sessionId },
+                        attachment = attachment
+                    )
+                    if (proxy?.sendMessage(message) == true) {
+                        dialog.dismiss()
+                    } else {
+                        Toast.makeText(context, "红包发送失败", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+        dialog.show()
     }
 
     // 模拟接收消息，用于演示
