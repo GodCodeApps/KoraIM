@@ -4,8 +4,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9%2B-purple.svg)](https://kotlinlang.org)
 
-**KoraIM** 是由 **GodCodeApps** 开源的轻量级、高性能、易扩展的 Android 即时通讯（IM）SDK 框架。
-架构设计上实现 **通信内核（imcore）** 与 **UI 组件（imui）** 的彻底解耦，帮助 Android 开发者在 **5 分钟内快速搭建具备微信级交互体验的聊天系统**。
+**KoraIM** 是由 **GodCodeApps** 开源的轻量级、高性能、易扩展的 Android 即时通讯（IM）SDK 框架。架构设计上实现了 **通信内核（imcore）** 与 **UI 组件（imui）** 的彻底解耦，帮助 Android 开发者在 **5 分钟内快速搭建具备微信级交互体验的聊天系统**。
 
 ---
 
@@ -55,7 +54,45 @@ KoraIM
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <uses-per            override suspend fun uploadVoice(request: VoiceUploadRequest): VoiceUploadResult {
+    <!-- Android 12 及以下读写存储权限 -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+
+    <application ...>
+        <!-- 聊天页面配置 adjustResize 确保键盘与输入面板无缝切换 -->
+        <activity
+            android:name=".ChatActivity"
+            android:windowSoftInputMode="adjustResize" />
+    </application>
+</manifest>
+```
+
+### 2. Application 中初始化 SDK
+
+在 `Application.onCreate` 中初始化 `IMClient` 并配置媒体上传 Provider（如 OSS/COS/自建文件服务器）：
+
+```kotlin
+class App : Application() {
+    override fun onCreate() {
+        super.onCreate()
+
+        // 1. 初始化 IM 核心引擎 (配置服务器 IP 和端口)
+        IMClient.init(this, host = "192.168.1.100", port = 8090)
+
+        // 2. 配置多媒体文件上传 Provider (SPI 插件化设计)
+        ImUIKit.setMediaMessageProvider(object : IMMediaMessageProvider {
+            override suspend fun uploadImage(request: ImageUploadRequest): ImageUploadResult {
+                val remoteUrl = uploadToOss(request.localPath)
+                return ImageUploadResult(remoteUrl)
+            }
+
+            override suspend fun uploadVideo(request: VideoUploadRequest): VideoUploadResult {
+                val videoUrl = uploadToOss(request.localVideoPath)
+                val coverUrl = uploadToOss(request.localCoverPath)
+                return VideoUploadResult(videoUrl, coverUrl)
+            }
+
+            override suspend fun uploadVoice(request: VoiceUploadRequest): VoiceUploadResult {
                 val voiceUrl = uploadToOss(request.localPath)
                 return VoiceUploadResult(voiceUrl)
             }
@@ -64,11 +101,9 @@ KoraIM
 }
 ```
 
----
+### 3. 会话列表接入 (`IConversationListFragment`)
 
-### 3. 接入会话列表 (`IConversationListFragment`)
-
-继承 `IConversationListFragment`，仅需重写 3 个方法即可拥有带顶部网络连接提示条、置顶、未读红点、失败标记的完整会话列表：
+继承 `IConversationListFragment`，重写 3 个简单方法即可展示带有未读红点、失败标记的会话列表：
 
 ```kotlin
 class MyConversationListFragment : IConversationListFragment() {
@@ -95,9 +130,7 @@ class MyConversationListFragment : IConversationListFragment() {
 }
 ```
 
----
-
-### 4. 接入聊天页面 (`IMessageFragment`)
+### 4. 聊天页面接入 (`IMessageFragment`)
 
 在你的 `ChatActivity` 中挂载继承自 `IMessageFragment` 的 Fragment：
 
@@ -153,10 +186,10 @@ class MyChatFragment : IMessageFragment() {
 `MessageBuilder` 提供便捷的方法构造开箱即用的消息实体：
 - `MessageBuilder.createTextMessage(sessionId, sessionType, msg = "你好")`
 - `MessageBuilder.createImageMessage(sessionId, sessionType, localPath = "...", ...)`
-- `MessageBuilder.createVoiceMessage(...)`
-- `MessageBuilder.createVideoMessage(...)`
-- `MessageBuilder.createRedPacketMessage(...)`
-- `MessageBuilder.createTipMessage(...)`
+- `MessageBuilder.createVoiceMessage(sessionId, sessionType, localPath = "...", duration = 5)`
+- `MessageBuilder.createVideoMessage(sessionId, sessionType, localVideoPath = "...", ...)`
+- `MessageBuilder.createRedPacketMessage(sessionId, sessionType, id = "...", greetings = "恭喜发财")`
+- `MessageBuilder.createTipMessage(sessionId, sessionType, tip = "你领取了对方的红包")`
 
 ---
 
@@ -218,86 +251,5 @@ npm start
 ## 📄 开源许可证
 
 KoraIM 基于 **[Apache License 2.0](LICENSE)** 协议开源。欢迎提交 Issue 与 Pull Request！
-�� Flow（用于 UI 自动刷新） |
-| IMClient.observeP2PMessages(peerId) | 响应式监听与指定用户的点对点消息 Flow |
-| IMClient.markAsRead(sessionId, type) | 标记某个会话的消息为已读，清除未读角标 |
-| IMClient.deleteMessage(messageId) | 删除单条消息 |
 
-### 3. 会话与未读数统计 (IMClient)
-
-| API 方法 | 作用说明 |
-|:---|:---|
-| IMClient.observeConversations() | 响应式监听所有会话列表 Flow（按最后一条消息时间降序） |
-| IMClient.observeUnreadTotal() | 响应式监听全局总未读数 Flow（用于 App 底部 Tab 栏红点角标） |
-| IMClient.deleteConversation(sessionId, type)| 删除指定会话及其本地聊天记录 |
-
-### 4. 快捷消息工厂 (MessageBuilder)
-
-MessageBuilder 提供便捷的方法构造开箱即用的消息实体：
-- MessageBuilder.createTextMessage(sessionId, sessionType, msg = "你好")
-- MessageBuilder.createImageMessage(sessionId, sessionType, localPath = "...", ...)
-- MessageBuilder.createVoiceMessage(...)
-- MessageBuilder.createVideoMessage(...)
-- MessageBuilder.createRedPacketMessage(...)
-- MessageBuilder.createTipMessage(...)
-
----
-
-## 🎨 3 步扩展自定义业务消息气泡
-
-如果需要扩展例如“商品卡片”、“优惠券”等自定义消息类型，无需修改 SDK 源码，只需简单 3 步：
-
-### 第 1 步：定义自定义 Attachment 实体
-`kotlin
-data class GoodsAttachment(
-    var goodsId: String = "",
-    var goodsName: String = "",
-    var price: String = "",
-    var imageUrl: String = ""
-) : MsgAttachment {
-    constructor(json: String) : this() {
-        // 从 json 反序列化
-    }
-    override fun toJson(forNetwork: Boolean): String = Gson().toJson(this)
-    override fun getMsgType(): Int = 1001 // 自定义消息 Type (> 1000)
-}
-`
-
-### 第 2 步：编写自定义气泡 ViewHolder
-`kotlin
-class MsgGoodsViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
-    override fun getLayout(): Int = R.layout.item_msg_goods_card
-
-    override fun bindViewHolder(view: View, message: IMMessage) {
-        val goods = message.getAttachment() as GoodsAttachment
-        view.findViewById<TextView>(R.id.tv_goods_name).text = goods.goodsName
-        view.findViewById<TextView>(R.id.tv_goods_price).text = "¥"
-        Glide.with(view).load(goods.imageUrl).into(view.findViewById(R.id.iv_goods_pic))
-    }
-}
-`
-
-### 第 3 步：注册到气泡工厂
-`kotlin
-MsgViewHolderFactory.register(GoodsAttachment::class.java, MsgGoodsViewHolder::class.java)
-`
-
----
-
-## 🛠️ 本地联调服务端
-
-工程自带了一个用于本地联调的 Node.js TCP 演示服务端：
-
-`ash
-# 进入服务端目录
-cd server
-
-# 启动本地 TCP 消息中继服务 (默认监听 8090 端口)
-npm start
-`
-
----
-
-## 📄 开源许可证
-
-KoraIM 基于 **[Apache License 2.0](LICENSE)** 协议开源。欢迎提交 Issue 与 Pull Request！
+Copyright 2026 GodCodeApps
