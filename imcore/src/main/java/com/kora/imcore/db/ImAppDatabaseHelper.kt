@@ -8,7 +8,7 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
 
     companion object {
         const val DATABASE_NAME = "im_app_database.db"
-        const val DATABASE_VERSION = 6
+        const val DATABASE_VERSION = 7
 
         const val TABLE_MESSAGE = "message"
         const val TABLE_USER_INFO = "user_info"
@@ -74,6 +74,7 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
                 peerId TEXT NOT NULL DEFAULT '',
                 lastMessageId TEXT NOT NULL DEFAULT '',
                 lastMessageType INTEGER NOT NULL DEFAULT 0,
+                lastMessageStatus INTEGER NOT NULL DEFAULT 0,
                 lastMessagePreview TEXT NOT NULL DEFAULT '',
                 lastMessageTime INTEGER NOT NULL DEFAULT 0,
                 unreadCount INTEGER NOT NULL DEFAULT 0,
@@ -92,7 +93,13 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
         createIndexes(db)
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 7) {
+            runCatching {
+                db.execSQL("ALTER TABLE $TABLE_CONVERSATION ADD COLUMN lastMessageStatus INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+    }
 
     private fun createIndexes(db: SQLiteDatabase) {
         db.execSQL(

@@ -49,7 +49,11 @@ class ConversationDao(private val dbHelper: ImAppDatabaseHelper) {
             "SELECT * FROM ${ImAppDatabaseHelper.TABLE_CONVERSATION} WHERE ownerId = ? AND sessionId = ? LIMIT 1",
             arrayOf(conversation.ownerId, conversation.sessionId)
         ).use { if (it.moveToFirst()) it.toConversation() else null }
-        val latest = if (previous != null && previous.lastMessageTime > conversation.lastMessageTime) previous else conversation
+        // 如果是最新消息、或者是对当前最新同一条消息的状态变更（如 SENDING -> FAIL / SUCCESS），采用传入的最新会话信息
+        val isNewerOrSameMessage = previous == null ||
+            conversation.lastMessageTime >= previous.lastMessageTime ||
+            conversation.lastMessageId == previous.lastMessageId
+        val latest = if (isNewerOrSameMessage) conversation else previous
         val values = ContentValues().apply {
             put("sessionId", latest.sessionId)
             put("sessionType", latest.sessionType)
@@ -57,6 +61,7 @@ class ConversationDao(private val dbHelper: ImAppDatabaseHelper) {
             put("peerId", latest.peerId)
             put("lastMessageId", latest.lastMessageId)
             put("lastMessageType", latest.lastMessageType)
+            put("lastMessageStatus", latest.lastMessageStatus)
             put("lastMessagePreview", latest.lastMessagePreview)
             put("lastMessageTime", latest.lastMessageTime)
             put("unreadCount", (previous?.unreadCount ?: 0) + if (incrementUnread) 1 else 0)
@@ -90,6 +95,7 @@ class ConversationDao(private val dbHelper: ImAppDatabaseHelper) {
         peerId = getString(getColumnIndexOrThrow("peerId")),
         lastMessageId = getString(getColumnIndexOrThrow("lastMessageId")),
         lastMessageType = getInt(getColumnIndexOrThrow("lastMessageType")),
+        lastMessageStatus = getColumnIndex("lastMessageStatus").takeIf { it >= 0 }?.let { getInt(it) } ?: com.kora.imcore.constant.MsgStatus.SUCCESS,
         lastMessagePreview = getString(getColumnIndexOrThrow("lastMessagePreview")),
         lastMessageTime = getLong(getColumnIndexOrThrow("lastMessageTime")),
         unreadCount = getInt(getColumnIndexOrThrow("unreadCount")),

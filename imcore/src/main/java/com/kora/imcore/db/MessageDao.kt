@@ -33,13 +33,14 @@ class MessageDao(
         peerId = if (senderId == ownerId) receiverId else senderId,
         lastMessageId = messageId,
         lastMessageType = type,
+        lastMessageStatus = status,
         lastMessagePreview = when (type) {
             MsgType.TEXT -> runCatching { JSONObject(attachment).optString("content") }.getOrDefault("")
             MsgType.IMAGE -> "[图片]"
             MsgType.VIDEO -> "[视频]"
             MsgType.VOICE -> "[语音]"
             MsgType.RED_PACKET -> "[红包]"
-            MsgType.TIP -> "[提示消息]"
+            MsgType.TIP -> runCatching { JSONObject(attachment).optString("content") }.getOrDefault("[提示消息]")
             else -> "[消息]"
         },
         lastMessageTime = time,

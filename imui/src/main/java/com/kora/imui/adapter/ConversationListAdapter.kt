@@ -47,7 +47,21 @@ internal class ConversationListAdapter(
 //            SessionType.GROUP -> "群聊"
 //            else -> "会话"
 //        }
-        view.findViewById<TextView>(R.id.im_conversation_preview).text = conversation.lastMessagePreview
+        val tvPreview = view.findViewById<TextView>(R.id.im_conversation_preview)
+        if (conversation.lastMessageStatus == com.kora.imcore.constant.MsgStatus.FAIL) {
+            val failPrefix = "[发送失败] "
+            val fullText = failPrefix + conversation.lastMessagePreview
+            val spannable = android.text.SpannableString(fullText)
+            spannable.setSpan(
+                android.text.style.ForegroundColorSpan(android.graphics.Color.parseColor("#E53935")),
+                0,
+                failPrefix.length,
+                android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            tvPreview.text = spannable
+        } else {
+            tvPreview.text = conversation.lastMessagePreview
+        }
         view.findViewById<TextView>(R.id.im_conversation_time).text =
             conversation.lastMessageTime.takeIf { it > 0 }?.let { timeFormat.format(Date(it)) }.orEmpty()
         view.findViewById<TextView>(R.id.im_conversation_unread).apply {

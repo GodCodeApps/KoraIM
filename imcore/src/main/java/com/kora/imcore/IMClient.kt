@@ -27,10 +27,45 @@ import kotlinx.coroutines.Dispatchers
 import com.kora.imcore.listener.UnreadCountListener
 import com.kora.imcore.listener.UnreadCountSubscription
 
-/** Public SDK facade. Transport, persistence and caches live in dedicated components. */
+/**
+ * IM SDK 的公开门面（Facade），是上层使用 KoraIM 的唯一入口。
+ *
+ * 职责：
+ * - 初始化 SDK（数据库、网络连接、消息同步）
+ * - 提供消息收发、会话管理、用户信息查询等公开 API
+ * - 通过 Kotlin Flow 暴露实时数据流（连接状态、新消息、消息更新、未读数）
+ *
+ * 使用方式：
+ * ```kotlin
+ * // 1. 设置当前账号
+ * ImSdkImpl.setAccount("user123")
+ *
+ * // 2. 初始化（内部会创建数据库、绑定后台 Service、建立 TCP 连接）
+ * IMClient.init(context, "192.168.1.100", 9090)
+ *
+ * // 3. 监听连接状态
+ * IMClient.connectionState.collect { state -> ... }
+ *
+ * // 4. 发送消息
+ * IMClient.sendMessage(message)
+ *
+ * // 5. 退出时释放资源
+ * IMClient.release()
+ * ```
+ */
 object IMClient {
+
+    /** 收到的新消息流，UI 层可收集此流来刷新聊天列表 */
     val incomingMessages: SharedFlow<Message> get() = IMEventHub.incomingMessages
+
+    /** 消息状态更新流（发送成功/失败等），UI 层可收集此流来更新消息气泡状态 */
     val messageUpdates: SharedFlow<Message> get() = IMEventHub.messageUpdates
+
+    /**
+     * 连接状态流，UI 层可收集此流来显示连接指示器。
+     * 可能的状态：[ConnectionState.Disconnected]、[ConnectionState.Connecting]、
+     * [ConnectionState.Reconnecting]、[ConnectionState.Connected]、[ConnectionState.Failed]
+     */
     val connectionState: StateFlow<ConnectionState> get() = IMEventHub.connectionState
 
     private var connectionManager: ConnectionManager? = null
@@ -38,6 +73,10 @@ object IMClient {
     private lateinit var userRepository: UserRepository
     private lateinit var conversationDao: ConversationDao
 
+    /**
+     * 用户信息提供器，上层 App 实现此接口来提供用户头像、昵称等信息。
+     * 必须在 [init] 之后设置。
+     */
     var userInfoProvider: IMUserInfoProvider?
         get() = if (::userRepository.isInitialized) userRepository.provider else null
         set(value) {
@@ -45,6 +84,16 @@ object IMClient {
             userRepository.provider = value
         }
 
+    /**
+     * 初始化 IM SDK。内部流程：
+     * 1. 创建 SQLite 数据库（消息、会话、用户、同步游标）
+     * 2. 恢复上次的增量同步游标
+     * 3. 绑定后台 [IMService]，建立到服务器的 TCP 长连接
+     *
+     * @param context Android 上下文，内部会自动取 applicationContext
+     * @param host 服务器地址
+     * @param port 服务器端口（1~65535）
+     */
     fun init(context: Context, host: String, port: Int) {
         require(host.isNotBlank()) { "host must not be blank" }
         require(port in 1..65535) { "port must be between 1 and 65535" }
@@ -65,38 +114,52 @@ object IMClient {
         connectionManager = ConnectionManager(appContext).also { it.connect(host, port, account, syncCursor) }
     }
 
+    /**
+     * 发送消息。内部会先持久化到本地数据库并更新会话列表（状态为 SENDING），
+     * 然后通过 TCP 连接发送到服务器，等待 ACK 后更新状态为 SUCCESS 或 FAIL。
+     */
     suspend fun sendMessage(message: IMMessage) {
         ensureInitialized()
-        messageRepository.upsert(message.getMessage())
+        val msg = message.getMessage()
+        if (msg.sessionId.isNotBlank()) {
+            messageRepository.confirm(msg, IMRuntime.ownerId)
+        } else {
+            messageRepository.upsert(msg)
+        }
         connectionManager?.send(message)
     }
 
+    /** 按会话 ID 观察消息列表（实时更新） */
     fun observeMessages(sessionId: String): Flow<List<Message>> {
         ensureInitialized()
         return messageRepository.observeSession(sessionId)
     }
 
+    /** 按对方用户 ID 观察 P2P 消息列表（实时更新） */
     fun observeP2PMessages(peerId: String): Flow<List<Message>> {
         ensureInitialized()
         return messageRepository.observeP2P(IMRuntime.ownerId, peerId)
     }
 
+    /** 获取与指定用户的 P2P 会话信息 */
     suspend fun getP2PConversation(peerId: String): Conversation? {
         ensureInitialized()
         return conversationDao.findP2P(IMRuntime.ownerId, peerId)
     }
 
+    /** 获取当前账号的所有会话列表 */
     suspend fun getConversations(): List<Conversation> {
         ensureInitialized()
         return conversationDao.getAll(IMRuntime.ownerId)
     }
 
+    /** 观察当前账号的会话列表（实时更新） */
     fun observeConversations(): Flow<List<Conversation>> {
         ensureInitialized()
         return conversationDao.observeAll(IMRuntime.ownerId)
     }
 
-    /** Database-backed total unread count for the current account. Emits immediately and on changes. */
+    /** 观察当前账号所有会话的总未读数（实时更新，去重发射） */
     fun observeTotalUnreadCount(): Flow<Int> {
         ensureInitialized()
         return conversationDao.observeAll(IMRuntime.ownerId)
@@ -108,7 +171,10 @@ object IMClient {
             .distinctUntilChanged()
     }
 
-    /** Java-friendly observer. Call cancel() when the host no longer needs badge updates. */
+    /**
+     * Java 友好的未读数监听器。
+     * 返回 [UnreadCountSubscription]，不再需要时调用 cancel() 取消订阅。
+     */
     fun addUnreadCountListener(listener: UnreadCountListener): UnreadCountSubscription {
         ensureInitialized()
         val job = IMRuntime.scope.launch {
@@ -121,47 +187,60 @@ object IMClient {
         return UnreadCountSubscription { job.cancel() }
     }
 
+    /** 将指定会话标记为已读，清除未读计数 */
     suspend fun markConversationRead(sessionId: String) {
         ensureInitialized()
         if (sessionId.isNotBlank()) conversationDao.markRead(IMRuntime.ownerId, sessionId)
     }
 
+    /** 观察指定会话的最新一条消息（用于会话列表的消息预览） */
     fun observeLastMessage(sessionId: String): Flow<Message> {
         ensureInitialized()
         return messageRepository.observeLastMessage(sessionId)
     }
 
+    /** 分页查询指定会话的消息列表 */
     suspend fun getMessagePage(sessionId: String, page: Int): List<Message> {
         ensureInitialized()
         return messageRepository.page(sessionId, page)
     }
 
+    /** 保存单条消息到本地数据库（不通过网络发送） */
     suspend fun saveMessage(message: IMMessage) {
         ensureInitialized()
         messageRepository.upsert(message.getMessage())
     }
 
+    /** 根据消息 ID 查询单条消息 */
     suspend fun getMessageById(messageId: String): Message? = withContext(Dispatchers.IO) {
         ensureInitialized()
         messageRepository.getMessageById(messageId)
     }
 
+    /** 批量保存消息到本地数据库 */
     suspend fun saveMessages(messages: List<Message>) {
         ensureInitialized()
         messageRepository.upsertAll(messages)
     }
 
+    /** 查询用户信息（先查缓存 → 数据库 → Provider 远程拉取） */
     suspend fun getUserInfo(account: String?): UserInfo? {
         ensureInitialized()
         return userRepository.get(account)
     }
 
+    /**
+     * 释放 SDK 资源：断开连接、清除缓存、取消后台协程。
+     * 切换账号前必须调用此方法。
+     */
     fun release() {
         connectionManager?.disconnect()
         connectionManager = null
         if (::userRepository.isInitialized) userRepository.clear()
+        IMRuntime.reset()
     }
 
+    /** 检查 SDK 是否已初始化 */
     private fun ensureInitialized() {
         check(connectionManager != null && ::messageRepository.isInitialized) {
             "IMClient.init(context, host, port) must be called first"
