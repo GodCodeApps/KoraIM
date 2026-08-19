@@ -8,9 +8,12 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.media.AudioAttributes
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -28,21 +31,25 @@ import kotlinx.coroutines.launch
 
 /**
  * IM 消息通知管理器：
- * 1. 适配 Android 7.0 ~ Android 14+ 消息通知栏弹窗（含提示音、横幅 Heads-up、震动）。
- * 2. 智能免打扰：当前正在聊天的前台会话自动忽略通知。
- * 3. 头像直接使用默认图标。
+ * 1. 适配 Android 7.0 ~ Android 14+ 消息通知栏弹窗（含系统提示音、顶部悬浮横幅 Heads-up、震动、呼吸灯）。
+ * 2. 升级全新渠道 ID 避免系统渠道缓存导致静音或横幅不弹出的问题。
+ * 3. 智能免打扰：当前正在聊天的前台会话自动忽略通知。
  * 4. 支持点击通知直接拉起对应聊天室。
  */
 object IMNotificationManager {
-    private const val CHANNEL_ID = "kora_im_chat_messages"
-    private const val CHANNEL_NAME = "聊天消息"
-    private const val CHANNEL_DESC = "用于接收即时聊天新消息提醒"
+    // 升级 Channel ID 到 v2，冲刷掉老版本系统缓存中的不可变渠道配置
+    private const val CHANNEL_ID = "kora_im_chat_messages_v2"
+    private const val CHANNEL_NAME = "即时聊天消息"
+    private const val CHANNEL_DESC = "用于接收单聊与群聊新消息，支持悬浮横幅与声音提示"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var isInitialized = false
     private var observeJob: Job? = null
     private var appContext: Context? = null
     private var targetChatActivityClass: Class<out Activity>? = null
+
+    /** 震动波形：静止 0ms，震动 250ms，间隔 200ms，再震动 250ms */
+    private val VIBRATE_PATTERN = longArrayOf(0, 250, 200, 250)
 
     /** 当前用户正在浏览的前台会话 ID 和对方账号（用于前台免打扰） */
     @Volatile
@@ -124,29 +131,62 @@ object IMNotificationManager {
         }
     }
 
+    /**
+     * 跳转至系统通知渠道设置页（方便用户手动开启国内厂商 ROM 的悬浮通知/横幅权限）
+     */
+    @JvmStatic
+    fun openNotificationChannelSettings(context: Context) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    putExtra(Settings.EXTRA_CHANNEL_ID, CHANNEL_ID)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            } else {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+
+            // 删除旧版可能已被系统锁定为静音/低优先级的旧渠道
+            runCatching {
+                notificationManager.deleteNotificationChannel("kora_im_chat_messages")
+            }
+
             val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
             val audioAttributes = AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_INSTANT)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .build()
 
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH // 高优先级保证横幅弹出
+                NotificationManager.IMPORTANCE_HIGH // 必须为 HIGH 才能触发悬浮横幅 (Heads-up)
             ).apply {
                 description = CHANNEL_DESC
                 enableLights(true)
+                lightColor = Color.GREEN
                 enableVibration(true)
+                vibrationPattern = VIBRATE_PATTERN
                 setSound(soundUri, audioAttributes)
                 setShowBadge(true)
                 lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
             }
 
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            notificationManager?.createNotificationChannel(channel)
+            notificationManager.createNotificationChannel(channel)
         }
     }
 
@@ -227,9 +267,11 @@ object IMNotificationManager {
             .setContentTitle(title)
             .setContentText(content)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setPriority(NotificationCompat.PRIORITY_MAX) // 最高优先级，促使横幅浮窗弹出
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setSound(soundUri)
+            .setVibrate(VIBRATE_PATTERN)
+            .setLights(Color.GREEN, 500, 1000)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
