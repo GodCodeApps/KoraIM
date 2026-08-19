@@ -59,6 +59,7 @@ public class ChatInputView extends LinearLayout {
         
         // Voice record callbacks
         void onVoiceRecordStart();
+        void onVoiceRecordMove(boolean willCancel);
         void onVoiceRecordEnd();
         void onVoiceRecordCancel();
     }
@@ -166,10 +167,14 @@ public class ChatInputView extends LinearLayout {
                     break;
                 case MotionEvent.ACTION_MOVE:
                     // Simple cancel detection (e.g. swipe up)
-                    if (event.getY() < -50) {
+                    boolean willCancel = event.getY() < -50;
+                    if (willCancel) {
                         btnVoiceRecord.setText("松开 取消");
                     } else {
                         btnVoiceRecord.setText("松开 结束");
+                    }
+                    if (listener != null) {
+                        listener.onVoiceRecordMove(willCancel);
                     }
                     break;
                 case MotionEvent.ACTION_UP:

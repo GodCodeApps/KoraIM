@@ -30,6 +30,17 @@ abstract class IConversationListFragment : Fragment() {
 
     override fun onViewCreated(view: View, state: Bundle?) {
         val empty = view.findViewById<TextView>(R.id.im_conversation_empty)
+        val networkBar = view.findViewById<View>(R.id.im_network_state_bar)
+        val tvNetworkState = view.findViewById<TextView>(R.id.im_tv_network_state)
+
+        // 点击网络状态条可跳转系统网络设置
+        networkBar.setOnClickListener {
+            runCatching {
+                val intent = android.content.Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS)
+                startActivity(intent)
+            }
+        }
+
         adapter = ConversationListAdapter(requireContext()) { item ->
             viewLifecycleOwner.lifecycleScope.launch {
                 IMClient.markConversationRead(item.conversation.sessionId)
@@ -40,20 +51,58 @@ abstract class IConversationListFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                IMClient.observeConversations().collect { conversations ->
-                    val items = conversations.map { conversation ->
-                        val profile = if (conversation.sessionType == SessionType.P2P) {
-                            IMClient.getUserInfo(conversation.peerId)
-                        } else null
-                        ConversationListItem(
-                            conversation = conversation,
-                            title = profile?.nickname?.takeIf(String::isNotBlank)
-                                ?: conversationTitle(conversation),
-                            avatar = profile?.avatar.orEmpty()
-                        )
+                // 监听 IM 连接状态（类似微信顶部网络断开/重连提示条）
+                launch {
+                    IMClient.connectionState.collect { connState ->
+                        when (connState) {
+                            is com.kora.imcore.event.ConnectionState.Connected -> {
+                                networkBar.visibility = View.GONE
+                            }
+                            is com.kora.imcore.event.ConnectionState.Connecting -> {
+                                networkBar.visibility = View.VISIBLE
+                                networkBar.setBackgroundColor(0xFFF0F5FF.toInt())
+                                tvNetworkState.text = "正在连接服务器..."
+                                tvNetworkState.setTextColor(0xFF2F54EB.toInt())
+                            }
+                            is com.kora.imcore.event.ConnectionState.Reconnecting -> {
+                                networkBar.visibility = View.VISIBLE
+                                networkBar.setBackgroundColor(0xFFFFF7E6.toInt())
+                                tvNetworkState.text = "当前网络不稳定，正在重连..."
+                                tvNetworkState.setTextColor(0xFFD46B08.toInt())
+                            }
+                            is com.kora.imcore.event.ConnectionState.Disconnected -> {
+                                networkBar.visibility = View.VISIBLE
+                                networkBar.setBackgroundColor(0xFFFFF1F0.toInt())
+                                tvNetworkState.text = "当前网络不可用，请检查你的网络设置"
+                                tvNetworkState.setTextColor(0xFF595959.toInt())
+                            }
+                            is com.kora.imcore.event.ConnectionState.Failed -> {
+                                networkBar.visibility = View.VISIBLE
+                                networkBar.setBackgroundColor(0xFFFFF1F0.toInt())
+                                tvNetworkState.text = "当前网络不可用，请检查你的网络设置"
+                                tvNetworkState.setTextColor(0xFF595959.toInt())
+                            }
+                        }
                     }
-                    adapter.submit(items)
-                    empty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+                }
+
+                // 监听会话列表数据
+                launch {
+                    IMClient.observeConversations().collect { conversations ->
+                        val items = conversations.map { conversation ->
+                            val profile = if (conversation.sessionType == SessionType.P2P) {
+                                IMClient.getUserInfo(conversation.peerId)
+                            } else null
+                            ConversationListItem(
+                                conversation = conversation,
+                                title = profile?.nickname?.takeIf(String::isNotBlank)
+                                    ?: conversationTitle(conversation),
+                                avatar = profile?.avatar.orEmpty()
+                            )
+                        }
+                        adapter.submit(items)
+                        empty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+                    }
                 }
             }
         }

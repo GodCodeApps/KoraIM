@@ -1,23 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical">
 
-    <ListView
-        android:id="@+id/im_conversation_list"
+    <!-- 顶部网络/连接状态提示条（类似微信） -->
+    <LinearLayout
+        android:id="@+id/im_network_state_bar"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:divider="#12000000"
-        android:dividerHeight="1dp"
-        android:listSelector="?android:attr/selectableItemBackground" />
+        android:layout_height="40dp"
+        android:background="#FFF1F0"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:visibility="gone">
 
-    <TextView
-        android:id="@+id/im_conversation_empty"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:text="暂无会话"
-        android:textColor="#8A8A8A"
-        android:textSize="14sp" />
-</FrameLayout>
+        <ImageView
+            android:id="@+id/im_iv_network_icon"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:src="@drawable/ic_msg_failed" />
+
+        <TextView
+            android:id="@+id/im_tv_network_state"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="当前网络不可用，请检查你的网络设置"
+            android:textColor="#595959"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <ListView
+            android:id="@+id/im_conversation_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:divider="#12000000"
+            android:dividerHeight="1dp"
+            android:listSelector="?android:attr/selectableItemBackground" />
+
+        <TextView
+            android:id="@+id/im_conversation_empty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="暂无会话"
+            android:textColor="#8A8A8A"
+            android:textSize="14sp" />
+    </FrameLayout>
+</LinearLayout>
 

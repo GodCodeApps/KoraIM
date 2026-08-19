@@ -141,4 +141,18 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
         viewLifecycleOwner.lifecycleScope.launch { IMClient.sendMessage(msg) }
         return true
     }
+
+    override fun onStop() {
+        super.onStop()
+        // 页面不可见时（切后台或跳转）立即停止语音播放，防止音频后台继续播放
+        com.kora.imui.utils.AudioPlayHelper.stopAudio()
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        // 视图销毁时释放音频资源
+        com.kora.imui.utils.AudioPlayHelper.stopAudio()
+        messageListPanelEx = null
+        inputPanel = null
+    }
 }

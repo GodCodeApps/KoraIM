@@ -23,9 +23,6 @@ android {
 }
 
 dependencies {
-//    implementation(libs.androidx.appcompat)
-//    implementation(libs.androidx.core.ktx)
-//    implementation(libs.material)
     implementation(libs.lifecycle.runtime.ktx)
     implementation(libs.refreshLayout)
     implementation(libs.glide)

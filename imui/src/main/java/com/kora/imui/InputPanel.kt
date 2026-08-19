@@ -222,7 +222,15 @@ class InputPanel(
             }
 
             private var audioRecordHelper: com.kora.imui.utils.AudioRecordHelper? = null
-            private var toast: Toast? = null
+            private var voiceRecordDialog: com.kora.imui.widget.VoiceRecordDialog? = null
+            private val amplitudeHandler = android.os.Handler(android.os.Looper.getMainLooper())
+            private val amplitudeRunnable = object : Runnable {
+                override fun run() {
+                    val amplitude = audioRecordHelper?.getMaxAmplitude() ?: 0
+                    voiceRecordDialog?.updateAmplitude(amplitude)
+                    amplitudeHandler.postDelayed(this, 100)
+                }
+            }
 
             private fun checkPermission(): Boolean {
                 val context = fragment.context ?: return false
@@ -236,29 +244,48 @@ class InputPanel(
             override fun onVoiceRecordStart() {
                 if (!checkPermission()) return
                 
+                val context = fragment.context ?: return
                 if (audioRecordHelper == null) {
-                    val cacheDir = fragment.context?.cacheDir
+                    val cacheDir = context.cacheDir
                     if (cacheDir != null) {
                         audioRecordHelper = com.kora.imui.utils.AudioRecordHelper(cacheDir)
                     }
                 }
                 
-                audioRecordHelper?.startRecording()
-                toast = Toast.makeText(fragment.context, "正在录音... 上滑取消", Toast.LENGTH_SHORT)
-                toast?.show()
+                val started = audioRecordHelper?.startRecording() ?: false
+                if (started) {
+                    if (voiceRecordDialog == null) {
+                        voiceRecordDialog = com.kora.imui.widget.VoiceRecordDialog(context)
+                    }
+                    voiceRecordDialog?.showRecording()
+                    amplitudeHandler.removeCallbacks(amplitudeRunnable)
+                    amplitudeHandler.post(amplitudeRunnable)
+                }
+            }
+
+            override fun onVoiceRecordMove(willCancel: Boolean) {
+                if (willCancel) {
+                    voiceRecordDialog?.showWantToCancel()
+                } else {
+                    voiceRecordDialog?.showRecording()
+                }
             }
 
             override fun onVoiceRecordEnd() {
-                toast?.cancel()
+                amplitudeHandler.removeCallbacks(amplitudeRunnable)
                 val result = audioRecordHelper?.stopRecording()
                 if (result != null) {
                     val path = result.first
                     val duration = result.second
                     
                     if (duration < 1000) {
-                        Toast.makeText(fragment.context, "录音时间太短", Toast.LENGTH_SHORT).show()
+                        voiceRecordDialog?.showTooShort {
+                            java.io.File(path).delete()
+                        }
                         return
                     }
+
+                    voiceRecordDialog?.dismiss()
 
                     // Create VoiceAttachment
                     val voiceAttach = VoiceAttachment().apply {
@@ -279,12 +306,14 @@ class InputPanel(
                         attachment = voiceAttach.toJson(false)
                     )
                     queueMediaMessage(msg)
+                } else {
+                    voiceRecordDialog?.dismiss()
                 }
             }
 
             override fun onVoiceRecordCancel() {
-                toast?.cancel()
-                Toast.makeText(fragment.context, "已取消录音", Toast.LENGTH_SHORT).show()
+                amplitudeHandler.removeCallbacks(amplitudeRunnable)
+                voiceRecordDialog?.dismiss()
                 audioRecordHelper?.cancelRecording()
             }
         })

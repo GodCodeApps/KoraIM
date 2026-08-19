@@ -36,6 +36,17 @@ class AudioRecordHelper(private val outputDir: File) {
     }
 
     /**
+     * 获取当前录音的最大振幅（0..32767），用于驱动音量波形动画。
+     */
+    fun getMaxAmplitude(): Int {
+        return try {
+            mediaRecorder?.maxAmplitude ?: 0
+        } catch (_: Exception) {
+            0
+        }
+    }
+
+    /**
      * @return Pair containing the file path and the duration in milliseconds
      */
     fun stopRecording(): Pair<String, Long>? {
