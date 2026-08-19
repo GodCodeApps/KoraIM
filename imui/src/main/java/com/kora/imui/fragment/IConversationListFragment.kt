@@ -43,13 +43,25 @@ abstract class IConversationListFragment : Fragment() {
             }
         }
 
-        adapter = ConversationListAdapter(requireContext()) { item ->
-            viewLifecycleOwner.lifecycleScope.launch {
-                IMClient.markConversationRead(item.conversation.sessionId)
-                onConversationClick(item.conversation)
+        adapter = ConversationListAdapter(
+            context = requireContext(),
+            onClick = { item ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    IMClient.markConversationRead(item.conversation.sessionId)
+                    onConversationClick(item.conversation)
+                }
+            },
+            onLongClick = { item ->
+                showConversationActionDialog(item.conversation, item.title)
             }
+        )
+        val listView = view.findViewById<ListView>(R.id.im_conversation_list)
+        listView.adapter = adapter
+        listView.setOnItemLongClickListener { _, _, position, _ ->
+            val item = adapter.getItem(position)
+            showConversationActionDialog(item.conversation, item.title)
+            true
         }
-        view.findViewById<ListView>(R.id.im_conversation_list).adapter = adapter
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -114,6 +126,45 @@ abstract class IConversationListFragment : Fragment() {
         SessionType.P2P -> conversation.peerId
         SessionType.GROUP -> "群聊 ${conversation.sessionId}"
         else -> conversation.sessionId
+    }
+
+    protected open fun showConversationActionDialog(conversation: Conversation, title: String) {
+        val options = mutableListOf<String>()
+        val actions = mutableListOf<() -> Unit>()
+
+        if (conversation.unreadCount > 0) {
+            options.add("标为已读")
+            actions.add {
+                viewLifecycleOwner.lifecycleScope.launch {
+                    IMClient.markConversationRead(conversation.sessionId)
+                }
+            }
+        }
+
+        options.add("删除该聊天")
+        actions.add {
+            showDeleteConfirmDialog(conversation)
+        }
+
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle(title)
+            .setItems(options.toTypedArray()) { _, which ->
+                actions.getOrNull(which)?.invoke()
+            }
+            .show()
+    }
+
+    protected open fun showDeleteConfirmDialog(conversation: Conversation) {
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle("删除该聊天")
+            .setMessage("删除后，将同时删除该聊天的全部历史记录")
+            .setPositiveButton("删除") { _, _ ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    IMClient.deleteConversation(conversation.sessionId)
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     protected abstract fun onConversationClick(conversation: Conversation)

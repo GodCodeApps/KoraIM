@@ -199,6 +199,12 @@ object IMClient {
         return messageRepository.observeLastMessage(sessionId)
     }
 
+    /** 根据消息 ID 查询单条消息 */
+    fun getMessage(messageId: String): Message? {
+        ensureInitialized()
+        return messageRepository.getMessageById(messageId)
+    }
+
     /** 分页查询指定会话的消息列表 */
     suspend fun getMessagePage(sessionId: String, page: Int): List<Message> {
         ensureInitialized()
@@ -209,6 +215,22 @@ object IMClient {
     suspend fun saveMessage(message: IMMessage) {
         ensureInitialized()
         messageRepository.upsert(message.getMessage())
+    }
+
+    /** 从本地数据库删除单条消息，并自动同步更新会话最新预览 */
+    suspend fun deleteMessage(messageId: String) {
+        ensureInitialized()
+        if (messageId.isNotBlank()) {
+            messageRepository.delete(messageId, IMRuntime.ownerId)
+        }
+    }
+
+    /** 从本地数据库删除整个会话及其下的所有消息记录 */
+    suspend fun deleteConversation(sessionId: String) {
+        ensureInitialized()
+        if (sessionId.isNotBlank()) {
+            conversationDao.delete(IMRuntime.ownerId, sessionId)
+        }
     }
 
     /** 根据消息 ID 查询单条消息 */

@@ -181,6 +181,12 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                 mMessage
             )
         }
+        contentContainer?.setOnLongClickListener {
+            val consumed = ImUIKitImpl.getSessionListener()?.getItemLongClickListener()?.invoke(mMessage) ?: false
+            if (consumed) return@setOnLongClickListener true
+            showDefaultMessageActionDialog(itemView.context, mMessage)
+            true
+        }
         leftAvatar?.setOnClickListener {
             ImUIKitImpl.getSessionListener()?.getAvatarClickListener()?.invoke(
                 mMessage?.senderId
@@ -236,5 +242,47 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
 
         }
         viewGroup.layoutParams = params
+    }
+
+    protected open fun showDefaultMessageActionDialog(context: android.content.Context, message: IMMessage?) {
+        val msg = message ?: return
+        val options = mutableListOf<String>()
+        val actions = mutableListOf<() -> Unit>()
+
+        val attachment = msg.getAttachment()
+        val textContent = when (attachment) {
+            is com.kora.imui.attachment.TextAttachment -> attachment.content
+            else -> if (msg.getMsgType() == MsgType.TEXT) msg.getMessage().attachment else null
+        }
+
+        if (!textContent.isNullOrEmpty()) {
+            options.add("复制")
+            actions.add {
+                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("message", textContent)
+                clipboard.setPrimaryClip(clip)
+                android.widget.Toast.makeText(context, "已复制", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        options.add("删除")
+        actions.add {
+            android.app.AlertDialog.Builder(context)
+                .setTitle("删除消息")
+                .setMessage("确定删除这条消息吗？")
+                .setPositiveButton("删除") { _, _ ->
+                    itemView.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
+                        IMClient.deleteMessage(msg.getMsgId())
+                    }
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+
+        android.app.AlertDialog.Builder(context)
+            .setItems(options.toTypedArray()) { _, which ->
+                actions.getOrNull(which)?.invoke()
+            }
+            .show()
     }
 }

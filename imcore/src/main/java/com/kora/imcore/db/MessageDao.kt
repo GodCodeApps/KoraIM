@@ -308,6 +308,70 @@ class MessageDao(
         }
     }
 
+    suspend fun deleteMessage(messageId: String, ownerId: String) = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            var sessionId: String? = null
+            db.rawQuery(
+                "SELECT ${ImAppDatabaseHelper.COLUMN_SESSION_ID} FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE ${ImAppDatabaseHelper.COLUMN_MESSAGE_ID} = ?",
+                arrayOf(messageId)
+            ).use { cursor ->
+                if (cursor.moveToFirst()) {
+                    sessionId = cursor.getString(0)
+                }
+            }
+
+            db.delete(
+                ImAppDatabaseHelper.TABLE_MESSAGE,
+                "${ImAppDatabaseHelper.COLUMN_MESSAGE_ID} = ?",
+                arrayOf(messageId)
+            )
+
+            if (!sessionId.isNullOrEmpty()) {
+                val isLatestInConversation = db.rawQuery(
+                    "SELECT 1 FROM ${ImAppDatabaseHelper.TABLE_CONVERSATION} WHERE ownerId = ? AND sessionId = ? AND lastMessageId = ?",
+                    arrayOf(ownerId, sessionId, messageId)
+                ).use { it.moveToFirst() }
+
+                if (isLatestInConversation) {
+                    val remainingLatestCursor = db.rawQuery(
+                        "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE ${ImAppDatabaseHelper.COLUMN_SESSION_ID} = ? ORDER BY ${ImAppDatabaseHelper.COLUMN_ID} DESC LIMIT 1",
+                        arrayOf(sessionId)
+                    )
+                    val remainingMessages = parseMessageList(remainingLatestCursor)
+                    if (remainingMessages.isNotEmpty()) {
+                        conversationDao.upsertInTransaction(
+                            db,
+                            remainingMessages.first().toConversation(ownerId),
+                            incrementUnread = false
+                        )
+                    } else {
+                        val cv = ContentValues().apply {
+                            put("lastMessageId", "")
+                            put("lastMessageType", 0)
+                            put("lastMessagePreview", "")
+                            put("lastMessageTime", 0L)
+                            put("updateTime", System.currentTimeMillis())
+                        }
+                        db.update(
+                            ImAppDatabaseHelper.TABLE_CONVERSATION,
+                            cv,
+                            "ownerId = ? AND sessionId = ?",
+                            arrayOf(ownerId, sessionId)
+                        )
+                    }
+                }
+            }
+
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        conversationDao.notifyChanged()
+        notifyChange()
+    }
+
     suspend fun deleteAllMessage() = withContext(Dispatchers.IO) {
         val db = dbHelper.writableDatabase
         db.delete(ImAppDatabaseHelper.TABLE_MESSAGE, null, null)

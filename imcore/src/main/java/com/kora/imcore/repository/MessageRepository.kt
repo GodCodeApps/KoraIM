@@ -52,4 +52,7 @@ internal class MessageRepository(private val dao: MessageDao) {
 
     /** 根据消息 ID 查询单条消息（同步方法） */
     fun getMessageById(messageId: String): Message? = dao.getMessageByMessageId(messageId)
+
+    /** 删除单条消息并更新会话预览 */
+    suspend fun delete(messageId: String, ownerId: String) = dao.deleteMessage(messageId, ownerId)
 }

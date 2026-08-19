@@ -8,9 +8,9 @@ import android.widget.BaseAdapter
 import android.widget.ImageView
 import android.widget.TextView
 import com.bumptech.glide.Glide
-import com.kora.imcore.constant.SessionType
 import com.kora.imcore.db.Conversation
 import com.kora.imui.R
+import com.kora.imui.provider.ConversationDigestFormatter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -28,7 +28,8 @@ internal data class ConversationListItem(
  */
 internal class ConversationListAdapter(
     private val context: Context,
-    private val onClick: (ConversationListItem) -> Unit
+    private val onClick: (ConversationListItem) -> Unit,
+    private val onLongClick: ((ConversationListItem) -> Unit)? = null
 ) : BaseAdapter() {
     private var items = emptyList<ConversationListItem>()
     private val timeFormat = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
@@ -53,9 +54,10 @@ internal class ConversationListAdapter(
 //            else -> "会话"
 //        }
         val tvPreview = view.findViewById<TextView>(R.id.im_conversation_preview)
+        val previewText = ConversationDigestFormatter.format(conversation)
         if (conversation.lastMessageStatus == com.kora.imcore.constant.MsgStatus.FAIL) {
             val failPrefix = "[发送失败] "
-            val fullText = failPrefix + conversation.lastMessagePreview
+            val fullText = failPrefix + previewText
             val spannable = android.text.SpannableString(fullText)
             spannable.setSpan(
                 android.text.style.ForegroundColorSpan(android.graphics.Color.parseColor("#E53935")),
@@ -65,7 +67,7 @@ internal class ConversationListAdapter(
             )
             tvPreview.text = spannable
         } else {
-            tvPreview.text = conversation.lastMessagePreview
+            tvPreview.text = previewText
         }
         view.findViewById<TextView>(R.id.im_conversation_time).text =
             conversation.lastMessageTime.takeIf { it > 0 }?.let { timeFormat.format(Date(it)) }.orEmpty()
@@ -80,6 +82,10 @@ internal class ConversationListAdapter(
             .circleCrop()
             .into(view.findViewById<ImageView>(R.id.im_conversation_avatar))
         view.setOnClickListener { onClick(item) }
+        view.setOnLongClickListener {
+            onLongClick?.invoke(item)
+            true
+        }
         return view
     }
 }

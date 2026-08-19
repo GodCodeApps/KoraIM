@@ -85,6 +85,27 @@ class ConversationDao(private val dbHelper: ImAppDatabaseHelper) {
         notifyChanged()
     }
 
+    suspend fun delete(ownerId: String, sessionId: String) = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            db.delete(
+                ImAppDatabaseHelper.TABLE_CONVERSATION,
+                "ownerId = ? AND sessionId = ?",
+                arrayOf(ownerId, sessionId)
+            )
+            db.delete(
+                ImAppDatabaseHelper.TABLE_MESSAGE,
+                "sessionId = ?",
+                arrayOf(sessionId)
+            )
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        notifyChanged()
+    }
+
     internal fun notifyChanged() { changes.value = changes.value + 1 }
 
     private fun android.database.Cursor.toConversation() = Conversation(
