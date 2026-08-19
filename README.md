@@ -21,7 +21,7 @@
   - **智能重连机制**：具备指数退避策略与网络状态变化感知，断网恢复秒级重连。
   - **端到端 ACK 可靠确认**：严格的消息 ID 追踪，发送超时自动标记为失败，支持一键重发。
 - 🔄 **全响应式数据流**：基于 SQLite + Kotlin Coroutines & StateFlow/SharedFlow，底层数据变更自动驱动 UI 秒级响应刷新。
-- 🧩 **高可扩展 SPI 设计**：多媒体文件上传采用 SPI 抽象，无缝对接任意 OSS、S3 或自建文件服务器；支持 3 步注册自定义消息卡片。
+- 🧩 **高可扩展 SPI 设计**：多媒体文件上传与自定义消息附件均基于 SPI 抽象，无缝对接任意 OSS/文件服务器，支持无侵入扩展自定义消息卡片。
 
 ---
 
@@ -233,11 +233,13 @@ class ChatActivity : AppCompatActivity() {
 
 ---
 
-## 🎨 3 步扩展自定义业务消息气泡
+## 🎨 扩展自定义业务消息气泡 (SPI 机制)
 
-如果需要扩展例如“商品卡片”、“优惠券”等自定义消息类型，无需修改 SDK 源码，只需简单 3 步：
+如果需要扩展例如“商品卡片”、“优惠券”等自定义消息类型，SDK 提供了基于 Java SPI 与气泡工厂的完全解耦扩展方案：
 
 ### 第 1 步：定义自定义 Attachment 实体
+实现 `MsgAttachment` 接口，必须提供带有 `json: String` 入参的构造函数供底层反序列化调用：
+
 ```kotlin
 data class GoodsAttachment(
     var goodsId: String = "",
@@ -245,15 +247,42 @@ data class GoodsAttachment(
     var price: String = "",
     var imageUrl: String = ""
 ) : MsgAttachment {
+
     constructor(json: String) : this() {
-        // 从 json 反序列化
+        runCatching {
+            val obj = org.json.JSONObject(json)
+            goodsId = obj.optString("goodsId")
+            goodsName = obj.optString("goodsName")
+            price = obj.optString("price")
+            imageUrl = obj.optString("imageUrl")
+        }
     }
-    override fun toJson(send: Boolean): String = Gson().toJson(this)
+
+    override fun toJson(send: Boolean): String = org.json.JSONObject().apply {
+        put("goodsId", goodsId)
+        put("goodsName", goodsName)
+        put("price", price)
+        put("imageUrl", imageUrl)
+    }.toString()
+
     override fun getMsgType(): Int = 1001 // 自定义消息 Type (> 1000)
 }
 ```
 
-### 第 2 步：编写自定义气泡 ViewHolder
+### 第 2 步：配置 SPI 服务发现（必须）
+为了让 `imcore` 内核在收到消息或从数据库读取时能够自动将 JSON 反序列化为 `GoodsAttachment`，需要在你的模块 `src/main/resources/META-INF/services/` 目录下创建或编辑文件：
+
+**文件路径**：`src/main/resources/META-INF/services/com.kora.imcore.attachment.MsgAttachment`  
+**文件内容**（添加你的 Attachment 全类名）：
+```text
+com.yourpkg.GoodsAttachment
+```
+
+> **原理说明**：`imcore` 初始化时会通过 `ServiceLoader.load(MsgAttachment::class.java)` 扫描并注册所有附件解析器，调用 `message.getAttachment()` 时即会自动识别并匹配对应类型。
+
+### 第 3 步：编写自定义气泡 ViewHolder
+继承 `MsgViewHolderBase` 实现布局加载与数据绑定：
+
 ```kotlin
 class MsgGoodsViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
     override fun getLayout(): Int = R.layout.item_msg_goods_card
@@ -267,7 +296,9 @@ class MsgGoodsViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
 }
 ```
 
-### 第 3 步：注册到气泡工厂
+### 第 4 步：注册到气泡工厂
+在 Application 或聊天页面初始化时注册映射关系：
+
 ```kotlin
 MsgViewHolderFactory.register(GoodsAttachment::class.java, MsgGoodsViewHolder::class.java)
 ```
