@@ -40,6 +40,26 @@ async function handleFrame(socket, line) {
             return;
         }
 
+        // 3.1 正在输入状态透传 (Typing Indicator)
+        if (envelope.type === 'typing') {
+            if (!socket.account) return;
+            const recipientId = String(envelope.receiverId || '').trim();
+            if (recipientId && recipientId !== socket.account) {
+                const recipientSockets = clients.get(recipientId);
+                const count = recipientSockets?.size || 0;
+                console.log(`[Typing] ${socket.account} is typing to ${recipientId} (online targets: ${count})`);
+                recipientSockets?.forEach(recSocket => {
+                    if (!recSocket.destroyed) {
+                        writeFrame(recSocket, {
+                            type: 'typing',
+                            senderId: socket.account
+                        });
+                    }
+                });
+            }
+            return;
+        }
+
         // 4. 同步 ACK（客户端确认消费到的最新游标）
         if (envelope.type === 'sync_ack') {
             if (socket.account && envelope.cursor !== undefined) {
