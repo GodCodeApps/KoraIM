@@ -3,6 +3,10 @@ package com.kora.imui.inputbox;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.graphics.Rect;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
@@ -18,8 +22,6 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -28,7 +30,16 @@ import com.kora.imui.R;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 底部输入框与多面板管理器：
+ * 1. 动态自适应并持久化保存真实键盘高度，面板与软键盘等高。
+ * 2. 键盘与面板严格互斥：键盘开启时面板 100% 隐藏，面板开启时键盘 100% 隐藏。
+ * 3. 采用可靠的全局布局高度监听与延迟防堆叠机制，彻底杜绝面板与键盘同时存在的 550dp 挤压截断问题。
+ */
 public class ChatInputView extends LinearLayout {
+
+    private static final String PREF_NAME = "im_keyboard_pref";
+    private static final String KEY_KEYBOARD_HEIGHT = "key_keyboard_height";
 
     private ImageView ivVoice;
     private EditText etMessage;
@@ -40,10 +51,12 @@ public class ChatInputView extends LinearLayout {
     private FrameLayout panelEmoji;
 
     private int keyboardHeight = 0;
-    private int fallbackPanelHeight;
     private OnInputListener listener;
     private RecyclerView rvMoreOptions;
     private RecyclerView rvEmoji;
+
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private boolean isKeyboardShowing = false;
 
     private enum InputMode {
         TEXT, VOICE, EMOJI, MORE, NONE
@@ -81,7 +94,10 @@ public class ChatInputView extends LinearLayout {
     private void init(Context context) {
         LayoutInflater.from(context).inflate(R.layout.view_chat_input, this, true);
         setOrientation(VERTICAL);
-        fallbackPanelHeight = (int) (250 * context.getResources().getDisplayMetrics().density + 0.5f);
+
+        SharedPreferences sp = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        int defaultHeight = (int) (270 * context.getResources().getDisplayMetrics().density + 0.5f);
+        keyboardHeight = sp.getInt(KEY_KEYBOARD_HEIGHT, defaultHeight);
 
         ivVoice = findViewById(R.id.iv_voice);
         etMessage = findViewById(R.id.et_message);
@@ -94,8 +110,13 @@ public class ChatInputView extends LinearLayout {
         rvMoreOptions = findViewById(R.id.rv_more_options);
         rvEmoji = findViewById(R.id.rv_emoji);
 
+        // 初始化时确保两个面板高度与软键盘等高，且全部处于 GONE 隐藏状态
+        preparePanel(panelMore);
+        preparePanel(panelEmoji);
+        hideAllPanels();
+
         setupListeners();
-        setupKeyboardListener();
+        setupGlobalLayoutListener();
         setupMoreOptionsPanel();
         setupEmojiPanel();
     }
@@ -115,11 +136,14 @@ public class ChatInputView extends LinearLayout {
             public void afterTextChanged(Editable s) {}
         });
 
-        etMessage.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_UP) {
+        // 点击输入框切回文本键盘输入
+        etMessage.setOnClickListener(v -> {
+            switchMode(InputMode.TEXT);
+        });
+        etMessage.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
                 switchMode(InputMode.TEXT);
             }
-            return false;
         });
 
         btnSend.setOnClickListener(v -> {
@@ -166,7 +190,6 @@ public class ChatInputView extends LinearLayout {
                     if (listener != null) listener.onVoiceRecordStart();
                     break;
                 case MotionEvent.ACTION_MOVE:
-                    // Simple cancel detection (e.g. swipe up)
                     boolean willCancel = event.getY() < -50;
                     if (willCancel) {
                         btnVoiceRecord.setText("松开 取消");
@@ -209,8 +232,9 @@ public class ChatInputView extends LinearLayout {
         
         InputMode oldMode = currentMode;
         currentMode = newMode;
-        
-        // Reset icons
+        mainHandler.removeCallbacksAndMessages(null);
+
+        // 重置按钮图标
         ivVoice.setImageResource(R.drawable.ic_voice);
         ivEmoji.setImageResource(R.drawable.ic_emoji);
         
@@ -218,13 +242,13 @@ public class ChatInputView extends LinearLayout {
             case TEXT:
                 btnVoiceRecord.setVisibility(GONE);
                 etMessage.setVisibility(VISIBLE);
+                updateSendButtonState();
                 hideAllPanels();
                 showKeyboard();
-                updateSendButtonState();
                 break;
                 
             case VOICE:
-                ivVoice.setImageResource(R.drawable.ic_keyboard); // Replace with keyboard icon
+                ivVoice.setImageResource(R.drawable.ic_keyboard);
                 etMessage.setVisibility(GONE);
                 btnVoiceRecord.setVisibility(VISIBLE);
                 hideKeyboard();
@@ -234,15 +258,18 @@ public class ChatInputView extends LinearLayout {
                 break;
                 
             case EMOJI:
-                ivEmoji.setImageResource(R.drawable.ic_keyboard); // Replace with keyboard icon
+                ivEmoji.setImageResource(R.drawable.ic_keyboard);
                 btnVoiceRecord.setVisibility(GONE);
                 etMessage.setVisibility(VISIBLE);
                 updateSendButtonState();
                 
-                if (oldMode == InputMode.TEXT) {
-                    preparePanel(panelEmoji);
-                    panelEmoji.setVisibility(VISIBLE);
+                if (oldMode == InputMode.TEXT && isKeyboardShowing) {
                     hideKeyboard();
+                    // 等待软键盘开始收起后再显示面板，绝不同步占位
+                    mainHandler.postDelayed(() -> {
+                        hideAllPanels();
+                        showPanel(panelEmoji);
+                    }, 120);
                 } else {
                     hideKeyboard();
                     hideAllPanels();
@@ -255,10 +282,13 @@ public class ChatInputView extends LinearLayout {
                 etMessage.setVisibility(VISIBLE);
                 updateSendButtonState();
                 
-                if (oldMode == InputMode.TEXT) {
-                    preparePanel(panelMore);
-                    panelMore.setVisibility(VISIBLE);
+                if (oldMode == InputMode.TEXT && isKeyboardShowing) {
                     hideKeyboard();
+                    // 等待软键盘开始收起后再显示面板，绝不同步占位
+                    mainHandler.postDelayed(() -> {
+                        hideAllPanels();
+                        showPanel(panelMore);
+                    }, 120);
                 } else {
                     hideKeyboard();
                     hideAllPanels();
@@ -279,34 +309,53 @@ public class ChatInputView extends LinearLayout {
     }
 
     private void preparePanel(View panel) {
-        int targetHeight = keyboardHeight > 0 ? keyboardHeight : fallbackPanelHeight;
-        if (panel.getLayoutParams().height != targetHeight) {
+        if (panel == null) return;
+        int targetHeight = keyboardHeight > 0 ? keyboardHeight : (int) (270 * getResources().getDisplayMetrics().density);
+        if (panel.getLayoutParams() != null && panel.getLayoutParams().height != targetHeight) {
             panel.getLayoutParams().height = targetHeight;
             panel.requestLayout();
         }
     }
 
-    private void setupKeyboardListener() {
-        ViewCompat.setOnApplyWindowInsetsListener(getRootView(), (v, insets) -> {
-            boolean isKeyboardVisible = insets.isVisible(WindowInsetsCompat.Type.ime());
-            int currentKeyboardHeight = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom;
+    private void setupGlobalLayoutListener() {
+        getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+            if (!(getContext() instanceof Activity)) return;
+            Activity activity = (Activity) getContext();
+            View decorView = activity.getWindow().getDecorView();
+            Rect r = new Rect();
+            decorView.getWindowVisibleDisplayFrame(r);
+            int screenHeight = decorView.getHeight();
+            int heightDiff = screenHeight - r.bottom;
 
-            if (isKeyboardVisible) {
-                if (currentKeyboardHeight > 0) {
-                    keyboardHeight = currentKeyboardHeight;
+            int minKeyboardHeight = (int) (120 * getResources().getDisplayMetrics().density);
+            boolean isKeyboardNowVisible = heightDiff > minKeyboardHeight;
+            isKeyboardShowing = isKeyboardNowVisible;
+
+            if (isKeyboardNowVisible) {
+                if (keyboardHeight != heightDiff) {
+                    keyboardHeight = heightDiff;
+                    getContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+                            .edit()
+                            .putInt(KEY_KEYBOARD_HEIGHT, heightDiff)
+                            .apply();
+                    preparePanel(panelMore);
+                    preparePanel(panelEmoji);
                 }
-                if (currentMode == InputMode.EMOJI || currentMode == InputMode.MORE || currentMode == InputMode.NONE) {
+
+                // 键盘在屏幕上可见时，强制隐藏所有面板，防止任何情况下产生 550dp 双重堆叠
+                if (panelMore.getVisibility() == VISIBLE || panelEmoji.getVisibility() == VISIBLE) {
+                    hideAllPanels();
+                }
+                if (currentMode != InputMode.TEXT && currentMode != InputMode.NONE) {
                     currentMode = InputMode.TEXT;
                     ivVoice.setImageResource(R.drawable.ic_voice);
                     ivEmoji.setImageResource(R.drawable.ic_emoji);
-                    hideAllPanels();
                 }
             } else {
                 if (currentMode == InputMode.TEXT && !etMessage.isFocused()) {
                     currentMode = InputMode.NONE;
                 }
             }
-            return insets;
         });
     }
 
@@ -371,3 +420,4 @@ public class ChatInputView extends LinearLayout {
         return false;
     }
 }
+

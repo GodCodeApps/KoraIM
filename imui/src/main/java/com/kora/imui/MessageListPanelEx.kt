@@ -44,7 +44,6 @@ class MessageListPanelEx(
         recyclerVew?.setHasFixedSize(true)
         mLinearLayoutManager =
             LinearLayoutManager(recyclerVew.context, LinearLayoutManager.VERTICAL, true)
-        mLinearLayoutManager?.stackFromEnd = true
         recyclerVew.layoutManager = mLinearLayoutManager
         recyclerVew.adapter = mMessageAdapter
         recyclerVew.itemAnimator?.changeDuration = 0
