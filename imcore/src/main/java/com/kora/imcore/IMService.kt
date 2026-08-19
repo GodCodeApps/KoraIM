@@ -109,6 +109,12 @@ class IMService : Service() {
         sendWithAck(message)
     }
 
+    /** 发送“正在输入”实时控制帧，直接发送不走持久化队列与 ACK */
+    internal fun sendTyping(receiverId: String) {
+        val activeChannel = channel?.takeIf { it.isActive } ?: return
+        activeChannel.writeAndFlush(WireEnvelope.typing(receiverId).encode(gson))
+    }
+
     /**
      * 主动断开连接并释放资源。
      * 会清空消息队列、取消所有等待中的 ACK 回调、注销网络监听。

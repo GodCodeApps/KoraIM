@@ -140,6 +140,20 @@ class InputPanel(
                 proxy?.sendMessage(createTextMessage)
             }
 
+            private var lastTypingTime = 0L
+
+            override fun onTyping() {
+                val now = System.currentTimeMillis()
+                if (now - lastTypingTime > 2500L) {
+                    lastTypingTime = now
+                    val target = peerId.ifBlank { sessionId }
+                    if (target.isNotBlank()) {
+                        android.util.Log.d("KoraIM_Typing", "InputPanel onTyping -> sending to: $target")
+                        com.kora.imcore.IMClient.sendTyping(target)
+                    }
+                }
+            }
+
             override fun onVoiceClick() {
                 // 处理点击语音按钮的逻辑
                 Toast.makeText(proxy?.getAppActivity(), "语音按钮点击", Toast.LENGTH_SHORT).show()

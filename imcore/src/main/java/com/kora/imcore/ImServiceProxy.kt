@@ -42,6 +42,11 @@ internal class ImServiceProxy : ServiceConnection {
         service?.send(message) ?: pendingMessages.offer(message)
     }
 
+    /** 发送正在输入控制信令 */
+    fun sendTyping(receiverId: String) {
+        service?.sendTyping(receiverId)
+    }
+
     /** 断开连接并清空状态 */
     fun disconnect() {
         service?.disconnect()

@@ -67,6 +67,14 @@ internal class ChatClientHandler(
                     // 收到心跳响应，重置计数
                     missedPongs = 0
                 }
+                WireEnvelope.TYPE_TYPING -> {
+                    // 收到对方正在输入的实时信令
+                    val senderId = envelope.senderId.orEmpty()
+                    if (senderId.isNotBlank()) {
+                        Log.d("KoraIM_Typing", "Received typing signal from sender: $senderId")
+                        IMEventHub.emitTyping(senderId)
+                    }
+                }
                 else -> Log.w(TAG, "Ignoring unknown frame type: ${envelope.type}")
             }
         } catch (error: Exception) {

@@ -68,6 +68,9 @@ object IMClient {
      */
     val connectionState: StateFlow<ConnectionState> get() = IMEventHub.connectionState
 
+    /** 对方正在输入事件流（携带 senderId），UI 层可收集此流展示“对方正在输入...” */
+    val typingEvents: SharedFlow<String> get() = IMEventHub.typingEvents
+
     private var connectionManager: ConnectionManager? = null
     private lateinit var messageRepository: MessageRepository
     private lateinit var userRepository: UserRepository
@@ -127,6 +130,17 @@ object IMClient {
             messageRepository.upsert(msg)
         }
         connectionManager?.send(message)
+    }
+
+    /**
+     * 发送“对方正在输入...”实时状态信令
+     *
+     * @param receiverId 接收方用户账号
+     */
+    fun sendTyping(receiverId: String) {
+        if (receiverId.isNotBlank()) {
+            connectionManager?.sendTyping(receiverId)
+        }
     }
 
     /** 按会话 ID 观察消息列表（实时更新） */

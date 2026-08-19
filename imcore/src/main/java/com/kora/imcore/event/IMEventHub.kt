@@ -30,15 +30,22 @@ internal object IMEventHub {
     /** 连接状态流，初始为 Disconnected */
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
 
+    /** 对方正在输入事件流（携带 senderId，缓冲 16 条，满时丢弃最旧的） */
+    private val _typingEvents = MutableSharedFlow<String>(extraBufferCapacity = 16, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
     val incomingMessages = _incomingMessages.asSharedFlow()
     val messageUpdates = _messageUpdates.asSharedFlow()
     val connectionState = _connectionState.asStateFlow()
+    val typingEvents = _typingEvents.asSharedFlow()
 
     /** 发射新消息事件（由 [IMRuntime.incoming] 调用） */
     fun emitIncoming(message: Message) { _incomingMessages.tryEmit(message) }
 
     /** 发射消息更新事件（由 [IMRuntime.updated] 调用） */
     fun emitUpdate(message: Message) { _messageUpdates.tryEmit(message) }
+
+    /** 发射正在输入事件（由 [ChatClientHandler] 调用） */
+    fun emitTyping(senderId: String) { _typingEvents.tryEmit(senderId) }
 
     /** 更新连接状态（由 [IMService] 和 [ImServiceProxy] 调用） */
     fun setConnectionState(state: ConnectionState) { _connectionState.value = state }

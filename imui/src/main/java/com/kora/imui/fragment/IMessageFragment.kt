@@ -53,14 +53,34 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
         view.findViewById<ImageView>(R.id.iv_back)?.setOnClickListener {
             activity?.onBackPressed()
         }
+        var originalTitle = peerId.ifBlank { sessionId }
         val tvTitle = view.findViewById<TextView>(R.id.tv_title)
-        tvTitle?.text = peerId.ifBlank { sessionId }
+        tvTitle?.text = originalTitle
         
         // 尝试从 Provider 获取真实的用户名
         viewLifecycleOwner.lifecycleScope.launch {
             val userInfo = IMClient.getUserInfo(peerId.ifBlank { sessionId })
             if (userInfo != null && !userInfo.nickname.isNullOrEmpty()) {
-                tvTitle?.text = userInfo.nickname
+                originalTitle = userInfo.nickname.orEmpty()
+                tvTitle?.text = originalTitle
+            }
+        }
+        
+        var typingResetJob: kotlinx.coroutines.Job? = null
+        
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                IMClient.typingEvents.collect { senderId ->
+                    android.util.Log.d("KoraIM_Typing", "IMessageFragment received typing from: '$senderId', target peerId: '$peerId'")
+                    if (senderId.isNotBlank() && senderId == peerId) {
+                        tvTitle?.text = "对方正在输入..."
+                        typingResetJob?.cancel()
+                        typingResetJob = viewLifecycleOwner.lifecycleScope.launch {
+                            kotlinx.coroutines.delay(4000)
+                            tvTitle?.text = originalTitle
+                        }
+                    }
+                }
             }
         }
         
@@ -105,7 +125,11 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
                 IMClient.incomingMessages.collect { message ->
                     val belongsHere = message.sessionId == currentSessionId ||
                         (currentSessionId.isBlank() && message.getIMSessionType() == SessionType.P2P && message.senderId == peerId)
-                    if (belongsHere) IMClient.markConversationRead(message.sessionId)
+                    if (belongsHere) {
+                        IMClient.markConversationRead(message.sessionId)
+                        typingResetJob?.cancel()
+                        tvTitle?.text = originalTitle
+                    }
                     
                     if (message.getMsgType() == com.kora.imcore.constant.MsgType.TIP) {
                         val attachment = message.getAttachment() as? com.kora.imui.attachment.TipAttachment

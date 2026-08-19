@@ -75,6 +75,8 @@ public class ChatInputView extends LinearLayout {
         void onVoiceRecordMove(boolean willCancel);
         void onVoiceRecordEnd();
         void onVoiceRecordCancel();
+
+        default void onTyping() {}
     }
 
     public void setOnInputListener(OnInputListener listener) {
@@ -130,6 +132,9 @@ public class ChatInputView extends LinearLayout {
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 updateSendButtonState();
+                if (s != null && s.length() > 0 && listener != null) {
+                    listener.onTyping();
+                }
             }
 
             @Override

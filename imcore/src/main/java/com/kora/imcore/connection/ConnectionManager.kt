@@ -39,6 +39,13 @@ internal class ConnectionManager(private val context: Context) {
         proxy.sendMessage(gson.toJson(message))
     }
 
+    /** 发送“正在输入”控制信令 */
+    fun sendTyping(receiverId: String) {
+        if (bound) {
+            proxy.sendTyping(receiverId)
+        }
+    }
+
     /** 断开连接并解绑 Service */
     fun disconnect() {
         proxy.disconnect()
