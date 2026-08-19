@@ -141,6 +141,16 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
         return true
     }
 
+    override fun onResume() {
+        super.onResume()
+        com.kora.imui.notification.IMNotificationManager.setCurrentActiveSession(sessionId, peerId)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        com.kora.imui.notification.IMNotificationManager.setCurrentActiveSession(null, null)
+    }
+
     override fun onStop() {
         super.onStop()
         // 页面不可见时（切后台或跳转）立即停止语音播放，防止音频后台继续播放
