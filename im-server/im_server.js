@@ -1,65 +1,29 @@
 // Copyright 2026 GodCodeApps. Licensed under the Apache License, Version 2.0.
 const net = require('net');
-const crypto = require('crypto');
-const PORT = Number(process.env.PORT || 8090);
+const config = require('./config');
+const { createStorage } = require('./storage');
+
+const PORT = config.port;
 const clients = new Map();
-const p2pSessions = new Map();
-const userEvents = new Map();
-const userCursors = new Map();
-const SYNC_PAGE_SIZE = 100;
-
-function p2pKey(first, second) {
-    return [first, second].sort().join(':');
-}
-
-function findOrCreateP2PSession(first, second) {
-    const key = p2pKey(first, second);
-    let sessionId = p2pSessions.get(key);
-    if (!sessionId) {
-        sessionId = `p2p_${crypto.randomUUID()}`;
-        p2pSessions.set(key, sessionId);
-        console.log(`[+] Created P2P session ${sessionId} for ${key}`);
-    }
-    return sessionId;
-}
-
-function appendUserEvent(userId, payload) {
-    const cursor = (userCursors.get(userId) || 0) + 1;
-    userCursors.set(userId, cursor);
-    const event = { cursor, eventType: 'message', payload };
-    const events = userEvents.get(userId) || [];
-    events.push(event);
-    userEvents.set(userId, events);
-    return event;
-}
+const storage = createStorage(config);
 
 function writeFrame(socket, frame) {
-    socket.write(`${JSON.stringify(frame)}\n`);
+    if (!socket.destroyed) {
+        socket.write(`${JSON.stringify(frame)}\n`);
+    }
 }
 
-const server = net.createServer((socket) => {
-    console.log(`[+] Client connected: ${socket.remoteAddress}:${socket.remotePort}`);
-    socket.setEncoding('utf8');
-    let buffer = '';
-
-    socket.on('data', (chunk) => {
-        buffer += chunk;
-        let newlineIndex;
-        while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
-            const line = buffer.slice(0, newlineIndex).trim();
-            buffer = buffer.slice(newlineIndex + 1);
-            if (line) handleFrame(socket, line);
-        }
-    });
-
-    socket.on('end', () => removeClient(socket));
-    socket.on('close', () => removeClient(socket));
-    socket.on('error', (error) => console.error(`[x] Socket error: ${error.message}`));
-});
-
-function handleFrame(socket, line) {
+async function handleFrame(socket, line) {
     try {
         const envelope = JSON.parse(line);
+
+        // 1. 处理心跳
+        if (envelope.type === 'ping') {
+            writeFrame(socket, { type: 'pong' });
+            return;
+        }
+
+        // 2. 登录认证
         if (envelope.type === 'login') {
             const account = String(envelope.account || '').trim();
             if (!account) throw new Error('Account is required');
@@ -70,63 +34,79 @@ function handleFrame(socket, line) {
             console.log(`[=] ${account} logged in`);
             return;
         }
-        // The Android client acknowledges delivered incoming messages. Delivery
-        // receipts are intentionally not persisted by this minimal demo server.
-        if (envelope.type === 'ack') return;
-        if (envelope.type === 'sync_ack') return;
+
+        // 3. 消息投递 ACK
+        if (envelope.type === 'ack') {
+            return;
+        }
+
+        // 4. 同步 ACK（客户端确认消费到的最新游标）
+        if (envelope.type === 'sync_ack') {
+            if (socket.account && envelope.cursor !== undefined) {
+                await storage.updateUserSyncAck(socket.account, envelope.cursor);
+            }
+            return;
+        }
+
+        // 5. 增量游标同步 (Sync)
         if (envelope.type === 'sync') {
             if (!socket.account) throw new Error('Login required');
             const cursor = Math.max(0, Number(envelope.cursor || 0));
-            const pending = (userEvents.get(socket.account) || []).filter(event => event.cursor > cursor);
-            const events = pending.slice(0, SYNC_PAGE_SIZE);
-            const nextCursor = events.length ? events[events.length - 1].cursor : cursor;
+            const { events, nextCursor, hasMore } = await storage.getSyncEvents(
+                socket.account,
+                cursor,
+                config.syncPageSize
+            );
             writeFrame(socket, {
                 type: 'sync_result',
                 events,
                 nextCursor,
-                hasMore: pending.length > events.length
+                hasMore
             });
             return;
         }
+
+        // 6. 发送即时消息
         if (envelope.type !== 'message' || !envelope.payload || !envelope.messageId) {
             throw new Error('Unsupported frame');
         }
         if (!socket.account) throw new Error('Login required');
 
         const recipientId = String(envelope.payload.receiverId || '').trim();
-        if (!recipientId || recipientId === socket.account) throw new Error('Invalid receiverId');
-        const sessionId = findOrCreateP2PSession(socket.account, recipientId);
+        if (!recipientId || recipientId === socket.account) {
+            throw new Error('Invalid receiverId');
+        }
 
-        const incoming = {
-            ...envelope.payload,
-            id: 0,
-            sessionId,
-            senderId: socket.account,
-            receiverId: recipientId,
-            direct: 1,
-            status: 1,
-            time: Date.now()
-        };
-        appendUserEvent(socket.account, incoming);
-        const event = appendUserEvent(recipientId, incoming);
-        writeFrame(socket, { type: 'ack', messageId: envelope.messageId, success: true, sessionId });
+        // 原子持久化：存消息、更新会话、分配游标、生成双方同步事件
+        const result = await storage.saveMessageAndEvents(socket.account, recipientId, envelope.payload);
+
+        // 回复发送方 ACK
+        writeFrame(socket, {
+            type: 'ack',
+            messageId: envelope.messageId,
+            success: true,
+            sessionId: result.sessionId
+        });
+
+        // 检查接收方在线连接并路由推送
         const recipientSockets = clients.get(recipientId);
         const activeRecipients = recipientSockets
             ? [...recipientSockets].filter(recipient => !recipient.destroyed)
             : [];
+
         if (activeRecipients.length) {
             activeRecipients.forEach(recipient => writeFrame(recipient, {
-                    type: 'message',
-                    messageId: incoming.messageId,
-                    cursor: event.cursor,
-                    payload: incoming
-                }));
-            console.log(`[>] ${socket.account} -> ${recipientId}`);
+                type: 'message',
+                messageId: result.fullMessage.messageId,
+                cursor: result.recipientCursor,
+                payload: result.fullMessage
+            }));
+            console.log(`[>] ${socket.account} -> ${recipientId} (delivered online)`);
         } else {
-            console.log(`[>] ${socket.account} -> ${recipientId} (stored offline)`);
+            console.log(`[>] ${socket.account} -> ${recipientId} (stored offline, cursor: ${result.recipientCursor})`);
         }
     } catch (error) {
-        console.error(`[!] Invalid frame: ${error.message}`);
+        console.error(`[!] Frame handling error: ${error.message}`);
     }
 }
 
@@ -139,5 +119,51 @@ function removeClient(socket) {
     }
 }
 
-server.on('error', (error) => console.error(`[x] Server error: ${error.message}`));
-server.listen(PORT, () => console.log(`KoraIM test server listening on ${PORT}`));
+async function startServer() {
+    // 1. 初始化持久化存储
+    await storage.init();
+
+    // 2. 创建 TCP 服务
+    const server = net.createServer((socket) => {
+        console.log(`[+] Client connected: ${socket.remoteAddress}:${socket.remotePort}`);
+        socket.setEncoding('utf8');
+        let buffer = '';
+
+        socket.on('data', (chunk) => {
+            buffer += chunk;
+            let newlineIndex;
+            while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+                const line = buffer.slice(0, newlineIndex).trim();
+                buffer = buffer.slice(newlineIndex + 1);
+                if (line) handleFrame(socket, line);
+            }
+        });
+
+        socket.on('end', () => removeClient(socket));
+        socket.on('close', () => removeClient(socket));
+        socket.on('error', (error) => console.error(`[x] Socket error: ${error.message}`));
+    });
+
+    server.on('error', (error) => console.error(`[x] Server error: ${error.message}`));
+
+    server.listen(PORT, () => {
+        console.log(`KoraIM Server running on port ${PORT} [Storage Engine: ${config.dbType.toUpperCase()}]`);
+    });
+
+    const shutdown = async () => {
+        console.log('\n[*] Shutting down server...');
+        server.close(async () => {
+            await storage.close();
+            console.log('[*] Server shut down gracefully');
+            process.exit(0);
+        });
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+}
+
+startServer().catch(err => {
+    console.error(`[FATAL] Failed to start server: ${err.message}`, err);
+    process.exit(1);
+});

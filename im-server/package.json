@@ -4,7 +4,14 @@
   "description": "A simple raw TCP test server for KoraIM Android client",
   "main": "im_server.js",
   "scripts": {
-    "start": "node im_server.js"
+    "start": "node im_server.js",
+    "test": "node test_server.js",
+    "clean-db": "node clear_db.js",
+    "clear-db": "node clear_db.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^8.7.0",
+    "mysql2": "^3.9.0"
   },
   "author": "GodCodeApps",
   "license": "Apache-2.0"

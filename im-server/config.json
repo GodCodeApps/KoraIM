@@ -1,0 +1,16 @@
+{
+  "port": 8090,
+  "dbType": "sqlite",
+  "sqlite": {
+    "filename": "./kora_im.db"
+  },
+  "mysql": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "user": "root",
+    "password": "",
+    "database": "kora_im",
+    "connectionLimit": 10
+  },
+  "syncPageSize": 100
+}
