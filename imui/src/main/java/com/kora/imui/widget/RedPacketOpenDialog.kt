@@ -17,6 +17,10 @@ import android.widget.TextView
 import com.kora.imui.R
 import com.kora.imui.attachment.RedPacketAttachment
 
+/**
+ * 3D 旋转开红包弹窗：
+ * 展示发送者头像/昵称与祝福语，点击金色“開”按钮播放 Y 轴 3D 旋转动画并触发领取。
+ */
 class RedPacketOpenDialog(
     context: Context,
     private val packet: RedPacketAttachment,

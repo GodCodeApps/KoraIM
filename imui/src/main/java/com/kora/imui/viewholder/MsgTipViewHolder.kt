@@ -12,6 +12,9 @@ import kotlinx.coroutines.launch
 import com.kora.imui.attachment.RedPacketAttachment
 import com.kora.imcore.constant.MsgDirection
 
+/**
+ * 系统居中提示消息气泡 ViewHolder（如“你领取了对方的红包”）。
+ */
 class MsgTipViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
     override fun getLayout(): Int = R.layout.im_message_item_tip
 

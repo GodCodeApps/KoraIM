@@ -32,9 +32,8 @@ import com.kora.imui.IMMediaMessageSender
 
 
 /**
- * Copyright 2026 GodCodeApps
- * @Date: 2026/07/15:10:02
- * @Description:聊天底部输入区域控制
+ * 聊天底部输入面板业务调度器：
+ * 负责聚合文本输入、语音录制（带 HUD 振幅波形弹窗）、相册图片/视频选择、发红包弹窗等动作。
  */
 class InputPanel(
     var fragment: Fragment,

@@ -11,10 +11,8 @@ import com.kora.imui.viewholder.MsgViewHolderFactory
 import kotlin.collections.get
 
 /**
- * Copyright 2026 GodCodeApps
- * @Author: pym
- * @Date: 2026/07/20:09:52
- * @Description:
+ * 聊天消息多类型 RecyclerView 适配器。
+ * 配合 MsgViewHolderFactory 动态映射各类型消息气泡。
  */
 class MsgListAdapter : RecyclerView.Adapter<MsgViewHolderBase>() {
     private var mMsgList = arrayListOf<IMMessage>()

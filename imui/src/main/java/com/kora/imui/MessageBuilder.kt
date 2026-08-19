@@ -13,12 +13,11 @@ import com.kora.imui.attachment.RedPacketAttachment
 import com.kora.imcore.constant.MsgStatus
 
 /**
- * Copyright 2026 GodCodeApps
- * @Author: pym
- * @Date: 2026/07/20:09:32
- * @Description:构建消息实例
+ * 消息构建工厂，提供各类消息（文本、图片、视频、红包、提示）的便捷创建方法。
  */
 object MessageBuilder {
+
+    /** 创建红包消息 */
     fun createRedPacketMessage(
         sessionId: String,
         @SessionType sessionType: Int,
@@ -36,6 +35,7 @@ object MessageBuilder {
         attachment = attachment.toJson(true)
     )
 
+    /** 创建视频消息 */
     fun createVideoMessage(
         sessionId: String,
         @SessionType sessionType: Int,
@@ -53,6 +53,7 @@ object MessageBuilder {
         attachment = attachment.toJson(false)
     )
 
+    /** 创建文本消息 */
     fun createTextMessage(
         sessionId: String,
         @SessionType sessionType: Int = SessionType.None,
@@ -75,6 +76,7 @@ object MessageBuilder {
         )
     }
 
+    /** 创建居中提示/通知消息（如领取红包提示） */
     fun createTipMessage(
         sessionId: String,
         @SessionType sessionType: Int = SessionType.None,
@@ -95,6 +97,7 @@ object MessageBuilder {
         )
     }
 
+    /** 创建图片消息 */
     fun createImageMessage(
         sessionId: String,
         @SessionType sessionType: Int = SessionType.None,

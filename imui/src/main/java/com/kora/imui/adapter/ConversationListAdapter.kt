@@ -15,12 +15,17 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/** 会话列表项数据包装类 */
 internal data class ConversationListItem(
     val conversation: Conversation,
     val title: String,
     val avatar: String
 )
 
+/**
+ * 会话列表 ListView 适配器。
+ * 负责渲染会话头像、标题、最新消息预览（含发送失败标记）、未读数角标与时间。
+ */
 internal class ConversationListAdapter(
     private val context: Context,
     private val onClick: (ConversationListItem) -> Unit

@@ -19,17 +19,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
-/** Runs the business upload and then hands the prepared message to IMCore. */
+/**
+ * 多媒体消息发送器（图片、视频、语音）：
+ * 负责在后台协程中上传本地多媒体文件，获取远程 URL 后再提交给 imcore 发送。
+ */
 object IMMediaMessageSender {
     private val running = ConcurrentHashMap.newKeySet<String>()
     private val uploadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private const val UPLOAD_TIMEOUT_MS = 120_000L
 
-    /** Media sending must outlive a chat Fragment/Activity recreation. */
+    /** 将多媒体消息推入后台队列异步上传并发送（不受页面销毁影响） */
     fun enqueue(message: Message) {
         uploadScope.launch { send(message) }
     }
 
+    /** 核心上传与发送流程：入库 -> 上传附件 -> 组装远程 URL -> 调用 IMClient.sendMessage */
     suspend fun send(message: Message) {
         if (!running.add(message.messageId)) return
         try {

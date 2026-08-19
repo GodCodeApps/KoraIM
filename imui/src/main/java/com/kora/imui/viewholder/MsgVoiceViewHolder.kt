@@ -9,6 +9,10 @@ import com.kora.imui.R
 import com.kora.imui.attachment.VoiceAttachment
 import java.io.File
 
+/**
+ * 语音消息气泡 ViewHolder：
+ * 负责时长计算、按时长比例拉伸气泡宽度，以及播放/停止动画切换。
+ */
 class MsgVoiceViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
 
     private val attachment: VoiceAttachment get() = mMessage?.getAttachment() as VoiceAttachment

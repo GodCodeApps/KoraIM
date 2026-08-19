@@ -9,10 +9,8 @@ import com.kora.imui.attachment.ImageAttachment
 import java.io.File
 
 /**
- * Copyright 2026 GodCodeApps
- * @Author: pym
- * @Date: 2026/07/16:18:42
- * @Description:
+ * 图片消息气泡 ViewHolder：
+ * 根据图片真实宽高比动态计算展示尺寸，支持本地/网络图片平滑加载。
  */
 class MsgImageViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
     private val attachment: ImageAttachment get() = mMessage?.getAttachment() as ImageAttachment

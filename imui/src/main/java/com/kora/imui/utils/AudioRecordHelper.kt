@@ -5,12 +5,17 @@ import android.util.Log
 import java.io.File
 import java.io.IOException
 
+/**
+ * 麦克风录音工具类：
+ * 采用 AAC 格式压缩录制音频，并提供实时最大振幅获取（供波形 HUD 动画使用）。
+ */
 class AudioRecordHelper(private val outputDir: File) {
 
     private var mediaRecorder: MediaRecorder? = null
     private var currentOutputFile: File? = null
     private var startTime: Long = 0
 
+    /** 开始麦克风录音 */
     fun startRecording(): Boolean {
         try {
             currentOutputFile = File(outputDir, "voice_${System.currentTimeMillis()}.aac")

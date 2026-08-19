@@ -34,10 +34,18 @@ data class VoiceUploadRequest(
 
 data class VoiceUploadResult(val remoteUrl: String)
 
-/** Implemented by the host app. IMUI never talks to a business file server directly. */
+/**
+ * 多媒体文件上传 SPI 接口：
+ * 由业务宿主 App 实现，负责将本地文件上传到业务 OSS/文件服务器并返回远程访问 URL。
+ */
 interface IMMediaMessageProvider {
+    /** 上传图片并返回远程图片 URL */
     suspend fun uploadImage(request: ImageUploadRequest): ImageUploadResult
+
+    /** 上传视频并返回远程视频与封面 URL */
     suspend fun uploadVideo(request: VideoUploadRequest): VideoUploadResult
+
+    /** 上传语音并返回远程音频 URL */
     suspend fun uploadVoice(request: VoiceUploadRequest): VoiceUploadResult
 }
 

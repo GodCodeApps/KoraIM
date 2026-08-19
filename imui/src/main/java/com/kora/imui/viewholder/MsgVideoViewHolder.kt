@@ -14,6 +14,10 @@ import com.kora.imui.R
 import com.kora.imui.attachment.VideoAttachment
 import java.io.File
 
+/**
+ * 视频消息气泡 ViewHolder：
+ * 展示视频首帧封面与时长，点击弹窗全屏播放视频。
+ */
 class MsgVideoViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
     private val attachment get() = mMessage?.getAttachment() as VideoAttachment
 

@@ -6,12 +6,7 @@ import com.kora.imcore.impl.IMMessage
 import com.kora.imui.R
 import com.kora.imui.attachment.UnknownAttachment
 
-/**
- * Copyright 2026 GodCodeApps
- * @Author: pym
- * @Date: 2026/07/16:19:38
- * @Description:
- */
+/** 未知/不支持消息类型的兜底气泡 ViewHolder */
 class MsgUnknownViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
     private val attachment: UnknownAttachment get() = mMessage?.getAttachment() as UnknownAttachment
 

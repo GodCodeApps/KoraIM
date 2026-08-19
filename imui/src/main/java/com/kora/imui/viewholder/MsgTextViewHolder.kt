@@ -7,12 +7,7 @@ import com.kora.imui.R
 import com.kora.imui.attachment.TextAttachment
 import com.kora.imui.inputbox.EmojiDisplayUtils
 
-/**
- * Copyright 2026 GodCodeApps
- * @Author: pym
- * @Date: 2026/07/16:18:42
- * @Description:
- */
+/** 文本与 Emoji 表情消息气泡 ViewHolder */
 class MsgTextViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
     private val attachment: TextAttachment get() = mMessage?.getAttachment() as TextAttachment
     override fun getLayout(): Int {

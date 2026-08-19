@@ -18,10 +18,10 @@ import com.kora.imui.adapter.MsgListAdapter
 import kotlinx.coroutines.launch
 
 /**
- * Copyright 2026 GodCodeApps
- * @Author: pym
- * @Date: 2021/4/28 10:10
- * @Description:管理消息列表
+ * 聊天消息列表控制器：
+ * 1. 管理 RecyclerView 消息列表与适配器。
+ * 2. 采用 ReverseLayout 模式布局，监听协程 Flow 实时刷新消息。
+ * 3. 智能判断滚动位置并在新消息或键盘弹出时自动重锚定到底部。
  */
 class MessageListPanelEx(
     var context: Fragment,

@@ -21,10 +21,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 
 /**
- * Copyright 2026 GodCodeApps
- * @Author: pym
- * @Date: 2026/07/15:09:35
- * @Description:im基类
+ * 聊天界面基础 Fragment：
+ * 1. 组合标题栏、[MessageListPanelEx] 消息列表与 [InputPanel] 底部输入面板。
+ * 2. 自动管理进入会话已读上报，并在页面退出时释放语音播放资源。
  */
 abstract class IMessageFragment : Fragment(), ModuleProxy {
     val sessionType get() = arguments?.getInt("session_type") ?: SessionType.None

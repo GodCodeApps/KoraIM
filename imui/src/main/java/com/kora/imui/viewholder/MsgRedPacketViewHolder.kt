@@ -11,6 +11,10 @@ import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
+/**
+ * 红包消息气泡 ViewHolder：
+ * 展示红包祝福语、未领/已领/过期状态，点击呼起 3D 翻转拆红包弹窗。
+ */
 class MsgRedPacketViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
     private val attachment: RedPacketAttachment
         get() = mMessage?.getAttachment() as RedPacketAttachment

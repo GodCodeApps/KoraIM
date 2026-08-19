@@ -4,19 +4,13 @@ import com.kora.imcore.impl.IMMessage
 
 
 /**
- * Copyright 2026 GodCodeApps
- * @Author: pym
- * @Date: 2026/07/21:14:59
- * @Description:
+ * 会话事件监听器：
+ * 支持监听头像点击/长按、消息气泡点击，以及发送失败消息的重试点击。
  */
 open class SessionEventListener {
-    //聊天头像点击
     private var onAvatarClickListener: ((account: String?) -> Unit)? = null
-    //聊天头像长按
     private var onAvatarLongClickListener: ((account: String?) -> Unit)? = null
-    //聊天消息点击
     private var onItemClickListener: ((message: IMMessage?) -> Unit)? = null
-    //聊天消息失败重发点击
     private var onResendClickListener: ((message: IMMessage?) -> Unit)? = null
     fun onAvatarClickListener(avatarClickListener: ((account: String?) -> Unit)?) {
         this.onAvatarClickListener = avatarClickListener

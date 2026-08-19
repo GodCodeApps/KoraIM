@@ -19,8 +19,10 @@ import com.kora.imui.adapter.ConversationListItem
 import kotlinx.coroutines.launch
 
 /**
- * Reusable conversation list UI. The host app subclasses it to own navigation,
- * while profile lookup and conversation persistence remain in the SDK.
+ * 会话列表基础 Fragment：
+ * 1. 包含微信风格顶部网络连接状态条（自动监听连接状态）。
+ * 2. 协程监听本地数据库会话流，自动刷新列表。
+ * 3. 业务层通过重写 [resolveTitle]、[resolveAvatar]、[onConversationClick] 实现自定义路由。
  */
 abstract class IConversationListFragment : Fragment() {
     private lateinit var adapter: ConversationListAdapter

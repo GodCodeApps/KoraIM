@@ -28,10 +28,8 @@ import com.kora.imcore.constant.MsgStatus
 import kotlinx.coroutines.launch
 
 /**
- * Copyright 2026 GodCodeApps
- * @Author: pym
- * @Date: 2026/07/16:18:42
- * @Description:
+ * 消息气泡基类 ViewHolder：
+ * 负责通用框架逻辑（发送/接收左右对齐、头像/昵称展示、时间分割线计算、发送中/失败重试状态展示）。
  */
 open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView) {
     var mMessage: IMMessage? = null

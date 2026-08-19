@@ -12,10 +12,8 @@ import com.kora.imui.attachment.TipAttachment
 import kotlin.collections.get
 
 /**
- * Copyright 2026 GodCodeApps
- * @Author: pym
- * @Date: 2026/07/16:18:45
- * @Description:
+ * 消息气泡 ViewHolder 注册工厂。
+ * 负责维护附件类型与 ViewHolder 的映射关系，支持业务方动态注册自定义气泡。
  */
 object MsgViewHolderFactory {
     private val viewHolders =
