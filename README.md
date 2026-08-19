@@ -10,17 +10,17 @@
 
 ## 🌟 核心特性
 
-- 🚀 **极简集成**：只需两步初始化即可拥有完整的收发消息、离线存储、会话管理与全套 UI。
+- 🚀 **极简集成**：只需设置账号与初始化两步，即可拥有完整的收发消息、离线存储、会话管理与全套 UI。
 - 💬 **微信级交互体验**：
   - **无缝软键盘/面板切换**：动态记忆真实软键盘高度，杜绝切换表情/更多面板时的闪烁跳动与多层堆叠。
   - **录音 HUD 实时波形**：按住说话弹出半透明 HUD，支持 6 级麦克风实时音量跳动波形与上滑取消视觉反馈。
-  - **富媒体气泡支持**：内置文本、Emoji、图片自适应宽高比、语音动态宽度、视频弹窗播放、3D 翻转拆红包、居中提示消息。
+  - **富媒体气泡支持**：内置文本、Emoji、图片自适应宽高比、语音动态宽度与播放动画、视频弹窗播放、3D 翻转拆红包、居中提示消息。
   - **网络状态条**：会话列表顶部展示类似微信的网络连接状态栏（连接中/重连中/断开警告），支持一键跳转网络设置。
 - 🛡️ **高可靠通信引擎**：
   - **TCP 长连接与应用层心跳保活**：定时保活监测，防止 NAT 超时断连。
   - **智能重连机制**：具备指数退避策略与网络状态变化感知，断网恢复秒级重连。
   - **端到端 ACK 可靠确认**：严格的消息 ID 追踪，发送超时自动标记为失败，支持一键重发。
-- 🔄 **全响应式数据流**：基于 SQLite + Kotlin Coroutines & StateFlow，底层数据变更自动驱动 UI 秒级响应刷新。
+- 🔄 **全响应式数据流**：基于 SQLite + Kotlin Coroutines & StateFlow/SharedFlow，底层数据变更自动驱动 UI 秒级响应刷新。
 - 🧩 **高可扩展 SPI 设计**：多媒体文件上传采用 SPI 抽象，无缝对接任意 OSS、S3 或自建文件服务器；支持 3 步注册自定义消息卡片。
 
 ---
@@ -61,69 +61,85 @@ KoraIM
     <application ...>
         <!-- 聊天页面配置 adjustResize 确保键盘与输入面板无缝切换 -->
         <activity
-            android:name=".ChatActivity"
+            android:name=".chat.ChatActivity"
             android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>
 ```
 
-### 2. Application 中初始化 SDK
+### 2. 初始化 SDK 与配置 Provider
 
-在 `Application.onCreate` 中初始化 `IMClient` 并配置媒体上传 Provider（如 OSS/COS/自建文件服务器）：
+在登录成功或进入主界面时，设置账号并完成 SDK 初始化：
 
 ```kotlin
-class App : Application() {
-    override fun onCreate() {
-        super.onCreate()
+// 1. 设置当前登录账号（必须在 IMClient.init 之前调用）
+ImSdkImpl.setAccount(currentAccount)
 
-        // 1. 初始化 IM 核心引擎 (配置服务器 IP 和端口)
-        IMClient.init(this, host = "192.168.1.100", port = 8090)
+// 2. 初始化 IM 核心引擎 (配置服务器 IP 和端口)
+IMClient.init(applicationContext, host = "192.168.1.9", port = 8090)
 
-        // 2. 配置多媒体文件上传 Provider (SPI 插件化设计)
-        ImUIKit.setMediaMessageProvider(object : IMMediaMessageProvider {
-            override suspend fun uploadImage(request: ImageUploadRequest): ImageUploadResult {
-                val remoteUrl = uploadToOss(request.localPath)
-                return ImageUploadResult(remoteUrl)
-            }
+// 3. 配置多媒体文件上传 Provider (图片、语音、视频上传)
+ImUIKitImpl.setMediaMessageProvider(object : IMMediaMessageProvider {
+    override suspend fun uploadImage(request: ImageUploadRequest): ImageUploadResult {
+        val remoteUrl = uploadToOss(request.localPath)
+        return ImageUploadResult(remoteUrl)
+    }
 
-            override suspend fun uploadVideo(request: VideoUploadRequest): VideoUploadResult {
-                val videoUrl = uploadToOss(request.localVideoPath)
-                val coverUrl = uploadToOss(request.localCoverPath)
-                return VideoUploadResult(videoUrl, coverUrl)
-            }
+    override suspend fun uploadVideo(request: VideoUploadRequest): VideoUploadResult {
+        val videoUrl = uploadToOss(request.localVideoPath)
+        val coverUrl = uploadToOss(request.localCoverPath)
+        return VideoUploadResult(videoUrl, coverUrl)
+    }
 
-            override suspend fun uploadVoice(request: VoiceUploadRequest): VoiceUploadResult {
-                val voiceUrl = uploadToOss(request.localPath)
-                return VoiceUploadResult(voiceUrl)
-            }
-        })
+    override suspend fun uploadVoice(request: VoiceUploadRequest): VoiceUploadResult {
+        val voiceUrl = uploadToOss(request.localPath)
+        return VoiceUploadResult(voiceUrl)
+    }
+})
+
+// 4. 配置用户信息 Provider (头像、昵称提供器)
+IMClient.userInfoProvider = object : IMUserInfoProvider {
+    override fun getUserInfo(account: String): UserInfo? {
+        return findLocalUser(account) // 从本地缓存/数据库同步获取
+    }
+
+    override fun fetchUserInfoFromServer(account: String, callback: (UserInfo?) -> Unit) {
+        fetchRemoteUser(account) { callback(it) } // 异步从业务服务器拉取
     }
 }
+
+// 5. 配置会话全局事件监听（头像点击、失败重发等）
+ImUIKitImpl.setSessionEventListener(SessionEventListener().apply {
+    onAvatarClickListener { account: String? ->
+        Toast.makeText(context, "点击了用户头像: $account", Toast.LENGTH_SHORT).show()
+    }
+    onResendClickListener { message: IMMessage? ->
+        (message as? Message)?.let {
+            lifecycleScope.launch {
+                if (IMMediaMessageSender.isMedia(it)) {
+                    IMMediaMessageSender.send(it)
+                } else {
+                    it.status = MsgStatus.SENDING
+                    IMClient.sendMessage(it)
+                }
+            }
+        }
+    }
+})
 ```
 
 ### 3. 会话列表接入 (`IConversationListFragment`)
 
-继承 `IConversationListFragment`，重写 3 个简单方法即可展示带有未读红点、失败标记的会话列表：
+继承 `IConversationListFragment`，只需重写点击事件路由：
 
 ```kotlin
-class MyConversationListFragment : IConversationListFragment() {
+class MessageFragment : IConversationListFragment() {
 
-    // 解析会话标题（例如从你本地的用户资料缓存库查询昵称）
-    override fun resolveTitle(conversation: Conversation): String {
-        return "用户 ${conversation.sessionId}"
-    }
-
-    // 解析会话头像 URL
-    override fun resolveAvatar(conversation: Conversation): String {
-        return "https://example.com/avatar/${conversation.sessionId}.png"
-    }
-
-    // 点击会话项跳转到聊天页面
-    override fun onConversationClick(item: ConversationListItem) {
-        val intent = Intent(requireContext(), ChatActivity::class.java).apply {
-            putExtra("session_type", item.conversation.sessionType)
-            putExtra("session_id", item.conversation.sessionId)
-            putExtra("peer_id", item.conversation.sessionId)
+    override fun onConversationClick(conversation: Conversation) {
+        val intent = Intent(activity, ChatActivity::class.java).apply {
+            putExtra("session_type", conversation.sessionType)
+            putExtra("session_id", conversation.sessionId)
+            putExtra("peer_id", conversation.peerId)
         }
         startActivity(intent)
     }
@@ -132,18 +148,28 @@ class MyConversationListFragment : IConversationListFragment() {
 
 ### 4. 聊天页面接入 (`IMessageFragment`)
 
-在你的 `ChatActivity` 中挂载继承自 `IMessageFragment` 的 Fragment：
+在 `ChatActivity` 中挂载继承自 `IMessageFragment` 的 Fragment：
 
 ```kotlin
-class MyChatFragment : IMessageFragment() {
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        
-        // 设置顶部聊天标题
-        setTitle("与 $peerId 的聊天")
-        
-        // 监听返回按钮
-        onBackClick { activity?.finish() }
+// 1. 定义聊天 Fragment
+class P2PChatFragment : IMessageFragment()
+
+// 2. 在 ChatActivity 中传递参数启动
+class ChatActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_chat)
+
+        val fragment = P2PChatFragment().apply {
+            arguments = Bundle().apply {
+                putInt("session_type", intent.getIntExtra("session_type", SessionType.P2P))
+                putString("session_id", intent.getStringExtra("session_id"))
+                putString("peer_id", intent.getStringExtra("peer_id"))
+            }
+        }
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .commit()
     }
 }
 ```
@@ -152,44 +178,58 @@ class MyChatFragment : IMessageFragment() {
 
 ## 📖 核心 API 说明
 
-### 1. 通信与连接控制 (`IMClient`)
+### 1. 通信与连接控制 (`IMClient` / `ImSdkImpl`)
 
-| API 方法 | 作用说明 |
+| API / 属性 | 作用说明 |
 |:---|:---|
-| `IMClient.init(context, host, port)` | 初始化 SDK 并建立 TCP 长连接与心跳机制 |
-| `IMClient.login(account, token)` | 切换账号登录 |
-| `IMClient.logout()` | 退出当前登录并断开长连接 |
-| `IMClient.release()` | 彻底释放网络资源与数据库连接 |
-| `IMClient.connectionState` | `StateFlow<ConnectionState>` 实时监听网络连接状态 (`Connected`, `Connecting`, `Reconnecting`, `Disconnected`) |
+| `ImSdkImpl.setAccount(account)` | 设置当前登录账号（**必须在 `IMClient.init` 之前调用**） |
+| `ImSdkImpl.getAccount()` | 获取当前登录账号 |
+| `IMClient.init(context, host, port)` | 初始化 SDK（创建 SQLite 数据库、建立 TCP 长连接、恢复增量同步游标） |
+| `IMClient.release()` | 断开长连接、清除缓存、释放协程与网络资源（退出登录或切换账号时调用） |
+| `IMClient.userInfoProvider` | 获取/设置 `IMUserInfoProvider`（头像与昵称数据源） |
+| `IMClient.connectionState` | `StateFlow<ConnectionState>` 实时监听网络连接状态（`Connected`, `Connecting`, `Reconnecting`, `Disconnected`, `Failed`） |
 
 ### 2. 消息操作与响应式监听 (`IMClient`)
 
 | API 方法 | 作用说明 |
 |:---|:---|
-| `IMClient.sendMessage(message)` | 发送消息（自动持久化、更新会话并等待服务端 ACK，超时自动标记失败） |
-| `IMClient.saveMessage(message)` | 本地插入或更新消息实体 |
-| `IMClient.observeMessages(sessionId)` | 响应式监听某个会话的全量消息列表 Flow（用于 UI 自动刷新） |
-| `IMClient.observeP2PMessages(peerId)` | 响应式监听与指定用户的点对点消息 Flow |
-| `IMClient.markAsRead(sessionId, type)` | 标记某个会话的消息为已读，清除未读角标 |
-| `IMClient.deleteMessage(messageId)` | 删除单条消息 |
+| `IMClient.incomingMessages` | `SharedFlow<Message>` 实时监听接收到的新消息 |
+| `IMClient.messageUpdates` | `SharedFlow<Message>` 实时监听消息状态变更（`SENDING` / `SUCCESS` / `FAIL`） |
+| `IMClient.sendMessage(message)` | 发送消息（自动入库、状态置为 `SENDING`，通过 TCP 发送并等待 ACK，超时自动标记失败） |
+| `IMClient.saveMessage(message)` | 保存/更新单条消息到本地 SQLite（不触发网络发送） |
+| `IMClient.saveMessages(messages)` | 批量保存消息到本地 SQLite |
+| `IMClient.getMessageById(messageId)` | 根据消息 ID 查询单条消息实体 |
+| `IMClient.getMessagePage(sessionId, page)` | 分页查询指定会话的历史消息记录 |
+| `IMClient.observeMessages(sessionId)` | `Flow<List<Message>>` 响应式监听指定会话的消息列表（用于聊天页自动刷新） |
+| `IMClient.observeP2PMessages(peerId)` | `Flow<List<Message>>` 响应式监听与指定用户的点对点消息 Flow |
+| `IMClient.observeLastMessage(sessionId)` | `Flow<Message>` 响应式监听指定会话的最新一条消息 |
 
 ### 3. 会话与未读数统计 (`IMClient`)
 
 | API 方法 | 作用说明 |
 |:---|:---|
-| `IMClient.observeConversations()` | 响应式监听所有会话列表 Flow（按最后一条消息时间降序） |
-| `IMClient.observeUnreadTotal()` | 响应式监听全局总未读数 Flow（用于 App 底部 Tab 栏红点角标） |
-| `IMClient.deleteConversation(sessionId, type)` | 删除指定会话及其本地聊天记录 |
+| `IMClient.getConversations()` | 异步获取当前账号的所有会话列表 |
+| `IMClient.getP2PConversation(peerId)` | 异步获取与指定用户的 P2P 会话实体 |
+| `IMClient.observeConversations()` | `Flow<List<Conversation>>` 响应式监听会话列表（按时间降序实时更新） |
+| `IMClient.observeTotalUnreadCount()` | `Flow<Int>` 响应式监听全局总未读数（用于 App 底部 Tab 栏红点角标） |
+| `IMClient.addUnreadCountListener(listener)` | Java 友好的未读数监听器，返回 `UnreadCountSubscription`（可调用 `cancel()` 取消） |
+| `IMClient.markConversationRead(sessionId)` | 标记某个会话的消息为已读，清除未读角标 |
+| `IMClient.getUserInfo(account)` | 综合查询用户信息（内存缓存 → SQLite 本地库 → `userInfoProvider` 远程拉取） |
 
 ### 4. 快捷消息工厂 (`MessageBuilder`)
 
-`MessageBuilder` 提供便捷的方法构造开箱即用的消息实体：
-- `MessageBuilder.createTextMessage(sessionId, sessionType, msg = "你好")`
-- `MessageBuilder.createImageMessage(sessionId, sessionType, localPath = "...", ...)`
-- `MessageBuilder.createVoiceMessage(sessionId, sessionType, localPath = "...", duration = 5)`
-- `MessageBuilder.createVideoMessage(sessionId, sessionType, localVideoPath = "...", ...)`
-- `MessageBuilder.createRedPacketMessage(sessionId, sessionType, id = "...", greetings = "恭喜发财")`
-- `MessageBuilder.createTipMessage(sessionId, sessionType, tip = "你领取了对方的红包")`
+`MessageBuilder` 提供便捷的方法构造各类标准消息实体：
+- `MessageBuilder.createTextMessage(sessionId, sessionType, msg = "你好", receiverId = ...)`
+- `MessageBuilder.createImageMessage(sessionId, sessionType, localPath = "...", mWidth = 1080, mHeight = 1920, size = 102400, mimeType = "image/jpeg")`
+- `MessageBuilder.createVideoMessage(sessionId, sessionType, receiverId, attachment)`
+- `MessageBuilder.createRedPacketMessage(sessionId, sessionType, receiverId, attachment)`
+- `MessageBuilder.createTipMessage(sessionId, sessionType, receiverId, msg = "提示文本")`
+
+### 5. 多媒体异步发送 (`IMMediaMessageSender`)
+
+- `IMMediaMessageSender.send(message)`: 协程挂起上传多媒体附件并调用 `IMClient.sendMessage`
+- `IMMediaMessageSender.enqueue(message)`: 推入后台全局队列执行上传并发送（页面销毁不受影响）
+- `IMMediaMessageSender.isMedia(message)`: 判断消息是否为图片/视频/语音等多媒体类型
 
 ---
 
@@ -208,7 +248,7 @@ data class GoodsAttachment(
     constructor(json: String) : this() {
         // 从 json 反序列化
     }
-    override fun toJson(forNetwork: Boolean): String = Gson().toJson(this)
+    override fun toJson(send: Boolean): String = Gson().toJson(this)
     override fun getMsgType(): Int = 1001 // 自定义消息 Type (> 1000)
 }
 ```
@@ -219,7 +259,7 @@ class MsgGoodsViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
     override fun getLayout(): Int = R.layout.item_msg_goods_card
 
     override fun bindViewHolder(view: View, message: IMMessage) {
-        val goods = message.getAttachment() as GoodsAttachment
+        val goods = MsgViewHolderFactory.getAttachment(message) as? GoodsAttachment ?: return
         view.findViewById<TextView>(R.id.tv_goods_name).text = goods.goodsName
         view.findViewById<TextView>(R.id.tv_goods_price).text = "¥${goods.price}"
         Glide.with(view).load(goods.imageUrl).into(view.findViewById(R.id.iv_goods_pic))
