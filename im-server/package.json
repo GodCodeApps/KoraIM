@@ -5,7 +5,8 @@
   "main": "im_server.js",
   "scripts": {
     "start": "node im_server.js",
-    "test": "node test_server.js",
+    "test": "node tests/test_server.js",
+    "test:restart": "node tests/test_restart_sync.js",
     "clean-db": "node clear_db.js",
     "clear-db": "node clear_db.js"
   },

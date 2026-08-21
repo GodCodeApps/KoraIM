@@ -1,8 +1,9 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.KoraIM" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/kora_green</item>
+        <item name="colorPrimaryDark">@color/kora_green_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
     </style>
 
     <style name="Theme.KoraIM" parent="Base.Theme.KoraIM" />

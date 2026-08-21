@@ -2,4 +2,28 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-</resources>
+
+    <!-- WeChat-style brand color -->
+    <color name="kora_green">#07C160</color>
+    <color name="kora_green_dark">#059A4C</color>
+    <color name="kora_green_light">#E8F9F0</color>
+
+    <!-- Background -->
+    <color name="bg_page">#EDEDED</color>
+    <color name="bg_item">#FFFFFF</color>
+
+    <!-- Text -->
+    <color name="text_primary">#191919</color>
+    <color name="text_secondary">#999999</color>
+    <color name="text_hint">#BDBDBD</color>
+
+    <!-- Divider -->
+    <color name="divider">#E5E5E5</color>
+
+    <!-- Avatar colors for 5 users -->
+    <color name="avatar_1">#5B8FF9</color>
+    <color name="avatar_2">#E86452</color>
+    <color name="avatar_3">#F6BD16</color>
+    <color name="avatar_4">#6DC8EC</color>
+    <color name="avatar_5">#A98BF0</color>
+</resources>

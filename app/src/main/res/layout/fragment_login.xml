@@ -2,28 +2,59 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center_horizontal"
-    android:orientation="vertical"
-    android:padding="32dp">
+    android:background="@color/bg_page"
+    android:orientation="vertical">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="72dp"
-        android:layout_marginBottom="24dp"
-        android:text="选择登录用户"
-        android:textSize="24sp"
-        android:textStyle="bold" />
-
-    <RadioGroup
-        android:id="@+id/account_group"
+    <!-- Header: green banner with logo + app name -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="200dp"
+        android:background="@drawable/bg_login_header"
+        android:gravity="center"
+        android:orientation="vertical">
 
-    <Button
-        android:id="@+id/login_button"
+        <!-- App icon circle -->
+        <FrameLayout
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:background="@drawable/bg_avatar_circle">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="K"
+                android:textColor="#FFFFFF"
+                android:textSize="34sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="KoraIM"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="选择账号登录"
+            android:textColor="#CCFFFFFF"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <!-- User list -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_users"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="登录" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/bg_page"
+        android:paddingTop="8dp"
+        android:clipToPadding="false" />
+
 </LinearLayout>
+

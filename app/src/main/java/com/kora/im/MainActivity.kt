@@ -24,14 +24,21 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         configureMessageActions()
         currentAccount = savedInstanceState?.getString(STATE_ACCOUNT)
-        if (currentAccount == null) showLogin() else initializeClient(currentAccount!!)
+        if (currentAccount == null) showLogin() else {
+            initializeClient(currentAccount!!)
+            showHome(currentAccount!!)
+        }
     }
 
     fun login(account: String) {
         currentAccount = account
         initializeClient(account)
+        showHome(account)
+    }
+
+    private fun showHome(account: String) {
         supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, UserListFragment.newInstance(account))
+            .replace(R.id.fragment_container, HomeFragment.newInstance(account))
             .commit()
     }
 
@@ -39,6 +46,8 @@ class MainActivity : AppCompatActivity() {
         ImSdkImpl.setAccount(account)
         IMClient.init(applicationContext, SERVER_HOST, SERVER_PORT)
         ImUIKitImpl.setMediaMessageProvider(AppMediaMessageProvider())
+        com.kora.imui.notification.IMNotificationManager.init(this, com.kora.im.chat.ChatActivity::class.java)
+        com.kora.imui.notification.IMNotificationManager.requestNotificationPermission(this)
         IMClient.userInfoProvider = object : IMUserInfoProvider {
             override fun getUserInfo(account: String): UserInfo? = DemoUsers.info(account)
             override fun fetchUserInfoFromServer(account: String, callback: (UserInfo?) -> Unit) {
@@ -47,8 +56,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
-    private fun showLogin() {
+    fun showLogin() {
+        currentAccount = null
         IMClient.release()
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, LoginFragment())
@@ -94,9 +103,36 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+/** Demo user data with realistic Chinese names and avatar colors. */
+data class DemoUserInfo(
+    val account: String,
+    val nickname: String,
+    val description: String,
+    val avatarColor: Int   // color resource id
+)
+
 object DemoUsers {
-    val accounts = listOf("test1", "test2", "test3")
-    fun info(account: String) = account.takeIf(accounts::contains)?.let {
-        UserInfo(it, "用户 ${it.removePrefix("test")}", "")
-    }
+    val accounts = listOf("test1", "test2", "test3", "test4", "test5")
+
+    private val users = listOf(
+        DemoUserInfo("test1", "陈晨",   "产品经理 · 北京",    android.R.color.holo_blue_light),
+        DemoUserInfo("test2", "林小雨",  "UI 设计师 · 上海",  android.R.color.holo_red_light),
+        DemoUserInfo("test3", "王思博",  "后端工程师 · 杭州", android.R.color.holo_orange_light),
+        DemoUserInfo("test4", "赵雨桐",  "数据分析师 · 深圳", android.R.color.holo_blue_dark),
+        DemoUserInfo("test5", "刘宇飞",  "前端工程师 · 成都", android.R.color.holo_purple)
+    )
+
+    private val userMap = users.associateBy { it.account }
+
+    fun demoUser(account: String): DemoUserInfo? = userMap[account]
+
+    fun info(account: String): UserInfo? =
+        userMap[account]?.let { UserInfo(it.account, it.nickname, "") }
+
+    /** Avatar background color resource ids in order (index 0..4) */
+    val avatarColorRes = listOf(
+        R.color.avatar_1, R.color.avatar_2, R.color.avatar_3,
+        R.color.avatar_4, R.color.avatar_5
+    )
 }
+
