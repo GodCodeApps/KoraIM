@@ -33,7 +33,72 @@ public class P2PChatFragment extends IMessageFragment {
             showCardSelectorDialog();
         } else if ("位置".equals(optionName)) {
             simulateLocationSelection();
+        } else if ("红包".equals(optionName)) {
+            showRedPacketDialog();
         }
+    }
+
+    private void showRedPacketDialog() {
+        android.content.Context context = getContext();
+        if (context == null) return;
+        android.view.View content = android.view.LayoutInflater.from(context)
+                .inflate(com.kora.im.R.layout.dialog_send_red_packet, null, false);
+        android.widget.EditText amountInput = content.findViewById(com.kora.im.R.id.et_red_packet_amount);
+        android.widget.EditText greetingInput = content.findViewById(com.kora.im.R.id.et_red_packet_greeting);
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(context)
+                .setTitle("发红包")
+                .setView(content)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("塞钱进红包", null)
+                .create();
+        dialog.setOnShowListener(d -> {
+            android.widget.Button btn = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE);
+            btn.setTextColor(android.graphics.Color.parseColor("#D94E3F"));
+            btn.setOnClickListener(v -> {
+                String amountStr = amountInput.getText().toString().trim();
+                java.math.BigDecimal amount;
+                try {
+                    amount = new java.math.BigDecimal(amountStr);
+                } catch (Exception e) {
+                    amountInput.setError("请输入正确的金额");
+                    return;
+                }
+                if (amount.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+                    amountInput.setError("请输入正确的金额");
+                    return;
+                }
+                if (amount.compareTo(new java.math.BigDecimal("200")) > 0) {
+                    amountInput.setError("单个红包不能超过200元");
+                    return;
+                }
+                if (amount.scale() > 2) {
+                    amountInput.setError("金额最多保留两位小数");
+                    return;
+                }
+                long amountFen = amount.movePointRight(2).longValueExact();
+                String greeting = greetingInput.getText().toString().trim();
+                if (greeting.isEmpty()) {
+                    greeting = com.kora.imui.attachment.RedPacketAttachment.DEFAULT_GREETING;
+                }
+                com.kora.imui.attachment.RedPacketAttachment attachment = new com.kora.imui.attachment.RedPacketAttachment();
+                attachment.setPacketId(java.util.UUID.randomUUID().toString());
+                attachment.setAmountFen(amountFen);
+                attachment.setGreeting(greeting);
+
+                IMMessage message = MessageBuilder.INSTANCE.createRedPacketMessage(
+                        getSessionId(),
+                        getSessionType(),
+                        getPeerId() != null && !getPeerId().isEmpty() ? getPeerId() : getSessionId(),
+                        attachment
+                );
+                if (sendMessage(message)) {
+                    dialog.dismiss();
+                } else {
+                    android.widget.Toast.makeText(context, "红包发送失败", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
+        dialog.show();
     }
 
     private void simulateLocationSelection() {
