@@ -35,6 +35,30 @@ object MessageBuilder {
         attachment = attachment.toJson(true)
     )
 
+    /** 创建个人名片消息 */
+    fun createCardMessage(
+        sessionId: String,
+        @SessionType sessionType: Int,
+        receiverId: String,
+        accountId: String,
+        nickname: String,
+        avatar: String
+    ): IMMessage = Message(
+        sessionId = sessionId,
+        sessionType = sessionType,
+        senderId = ImSdkImpl.getAccount() ?: "",
+        receiverId = receiverId,
+        type = com.kora.imui.attachment.CardAttachment.TYPE_CARD,
+        direct = MsgDirection.OUT,
+        status = MsgStatus.SENDING,
+        time = System.currentTimeMillis(),
+        attachment = com.kora.imui.attachment.CardAttachment().apply {
+            this.accountId = accountId
+            this.nickname = nickname
+            this.avatar = avatar
+        }.toJson(true)
+    )
+
     /** 创建视频消息 */
     fun createVideoMessage(
         sessionId: String,

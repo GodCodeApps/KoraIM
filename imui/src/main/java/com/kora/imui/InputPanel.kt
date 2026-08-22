@@ -225,9 +225,13 @@ class InputPanel(
                     return
                 }
 
-
-                Toast.makeText(proxy?.getAppActivity(), optionName + "按钮点击", Toast.LENGTH_SHORT)
-                    .show()
+                // If not handled by imui, bubble it up to the fragment
+                val currentFragment = fragment
+                if (currentFragment is com.kora.imui.fragment.IMessageFragment) {
+                    currentFragment.onMoreOptionClick(optionName ?: "")
+                }
+                
+                ImUIKitImpl.getSessionListener()?.getMoreOptionClickListener()?.invoke(optionName ?: "")
             }
 
             override fun onEmojiClick(emojiTag: String?) {

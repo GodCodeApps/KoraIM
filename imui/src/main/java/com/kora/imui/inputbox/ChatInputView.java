@@ -372,6 +372,7 @@ public class ChatInputView extends LinearLayout {
         options.add(new MoreOptionItem("视频通话", R.drawable.ic_more_video_call));
         options.add(new MoreOptionItem("位置", R.drawable.ic_more_location));
         options.add(new MoreOptionItem("红包", R.drawable.ic_more_red_packet));
+        options.add(new MoreOptionItem("个人名片", R.drawable.ic_more_card));
 
         MoreOptionsAdapter adapter = new MoreOptionsAdapter(getContext(), options);
         adapter.setOnItemClickListener(item -> {

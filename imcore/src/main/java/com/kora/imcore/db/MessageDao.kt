@@ -41,6 +41,10 @@ class MessageDao(
             MsgType.VOICE -> "[语音]"
             MsgType.RED_PACKET -> "[红包]"
             MsgType.TIP -> runCatching { JSONObject(attachment).optString("content") }.getOrDefault("[提示消息]")
+            1001 -> {
+                val nickname = runCatching { JSONObject(attachment).optString("nickname") }.getOrDefault("")
+                if (nickname.isNotBlank()) "[个人名片] $nickname" else "[个人名片]"
+            }
             else -> "[消息]"
         },
         lastMessageTime = time,

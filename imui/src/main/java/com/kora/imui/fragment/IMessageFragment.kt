@@ -165,6 +165,10 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
         return true
     }
 
+    open fun onMoreOptionClick(optionName: String) {
+        // Subclasses can override to handle custom more options (e.g. business card, location)
+    }
+
     override fun onResume() {
         super.onResume()
         com.kora.imui.notification.IMNotificationManager.setCurrentActiveSession(sessionId, peerId)
