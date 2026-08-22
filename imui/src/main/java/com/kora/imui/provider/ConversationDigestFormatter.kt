@@ -64,6 +64,7 @@ object ConversationDigestFormatter {
             is com.kora.imui.attachment.CardAttachment -> {
                 if (attachment.nickname.isNotBlank()) "[个人名片] ${attachment.nickname}" else "[个人名片]"
             }
+            is com.kora.imui.attachment.LocationAttachment -> "[位置]"
             else -> {
                 when (message.type) {
                     MsgType.TEXT -> message.attachment

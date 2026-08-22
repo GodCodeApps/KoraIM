@@ -31,7 +31,30 @@ public class P2PChatFragment extends IMessageFragment {
         super.onMoreOptionClick(optionName);
         if ("个人名片".equals(optionName)) {
             showCardSelectorDialog();
+        } else if ("位置".equals(optionName)) {
+            simulateLocationSelection();
         }
+    }
+
+    private void simulateLocationSelection() {
+        // Here we simulate opening a map activity and getting a result back
+        new AlertDialog.Builder(requireContext())
+                .setTitle("模拟地图选点")
+                .setMessage("假设你打开了高德/百度地图，并选择了一个位置：\n成都市武侯区天府软件园")
+                .setPositiveButton("发送该位置", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        IMMessage msg = MessageBuilder.INSTANCE.createLocationMessage(
+                                getSessionId(),
+                                getSessionType(),
+                                getPeerId() != null && !getPeerId().isEmpty() ? getPeerId() : getSessionId(),
+                                30.5432, 104.0623, "成都市武侯区天府软件园"
+                        );
+                        sendMessage(msg);
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     private void showCardSelectorDialog() {

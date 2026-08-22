@@ -45,6 +45,7 @@ class MessageDao(
                 val nickname = runCatching { JSONObject(attachment).optString("nickname") }.getOrDefault("")
                 if (nickname.isNotBlank()) "[个人名片] $nickname" else "[个人名片]"
             }
+            1002 -> "[位置]"
             else -> "[消息]"
         },
         lastMessageTime = time,

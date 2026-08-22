@@ -59,6 +59,30 @@ object MessageBuilder {
         }.toJson(true)
     )
 
+    /** 创建位置消息 */
+    fun createLocationMessage(
+        sessionId: String,
+        @SessionType sessionType: Int,
+        receiverId: String,
+        latitude: Double,
+        longitude: Double,
+        address: String
+    ): IMMessage = Message(
+        sessionId = sessionId,
+        sessionType = sessionType,
+        senderId = ImSdkImpl.getAccount() ?: "",
+        receiverId = receiverId,
+        type = com.kora.imui.attachment.LocationAttachment.TYPE_LOCATION,
+        direct = MsgDirection.OUT,
+        status = MsgStatus.SENDING,
+        time = System.currentTimeMillis(),
+        attachment = com.kora.imui.attachment.LocationAttachment().apply {
+            this.latitude = latitude
+            this.longitude = longitude
+            this.address = address
+        }.toJson(true)
+    )
+
     /** 创建视频消息 */
     fun createVideoMessage(
         sessionId: String,

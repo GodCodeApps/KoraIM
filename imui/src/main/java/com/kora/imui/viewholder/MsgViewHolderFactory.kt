@@ -25,6 +25,7 @@ object MsgViewHolderFactory {
             RedPacketAttachment::class.java to MsgRedPacketViewHolder::class.java,
             TipAttachment::class.java to MsgTipViewHolder::class.java,
             com.kora.imui.attachment.CardAttachment::class.java to MsgCardViewHolder::class.java,
+            com.kora.imui.attachment.LocationAttachment::class.java to MsgLocationViewHolder::class.java,
             UnknownAttachment::class.java to MsgUnknownViewHolder::class.java
         )
 

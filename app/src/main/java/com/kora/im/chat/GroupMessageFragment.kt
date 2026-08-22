@@ -13,7 +13,28 @@ class GroupMessageFragment : IMessageFragment() {
         super.onMoreOptionClick(optionName)
         if (optionName == "个人名片") {
             showCardSelectorDialog()
+        } else if (optionName == "位置") {
+            simulateLocationSelection()
         }
+    }
+
+    private fun simulateLocationSelection() {
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("模拟地图选点")
+            .setMessage("假设你打开了高德/百度地图，并选择了一个位置：\n成都市武侯区天府软件园")
+            .setPositiveButton("发送该位置") { _, _ ->
+                val msg = com.kora.imui.MessageBuilder.createLocationMessage(
+                    sessionId = sessionId,
+                    sessionType = sessionType,
+                    receiverId = if (!peerId.isNullOrEmpty()) peerId else sessionId,
+                    latitude = 30.5432,
+                    longitude = 104.0623,
+                    address = "成都市武侯区天府软件园"
+                )
+                sendMessage(msg)
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun showCardSelectorDialog() {
