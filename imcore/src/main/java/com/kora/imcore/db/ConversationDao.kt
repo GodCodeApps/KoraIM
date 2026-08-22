@@ -44,13 +44,13 @@ class ConversationDao(private val dbHelper: ImAppDatabaseHelper) {
         }
     }
 
-    internal fun upsertInTransaction(db: SQLiteDatabase, conversation: Conversation, incrementUnread: Boolean = false) {
+    internal fun upsertInTransaction(db: SQLiteDatabase, conversation: Conversation, incrementUnread: Boolean = false, forceUpdate: Boolean = false) {
         val previous = db.rawQuery(
             "SELECT * FROM ${ImAppDatabaseHelper.TABLE_CONVERSATION} WHERE ownerId = ? AND sessionId = ? LIMIT 1",
             arrayOf(conversation.ownerId, conversation.sessionId)
         ).use { if (it.moveToFirst()) it.toConversation() else null }
-        // 如果是最新消息、或者是对当前最新同一条消息的状态变更（如 SENDING -> FAIL / SUCCESS），采用传入的最新会话信息
-        val isNewerOrSameMessage = previous == null ||
+        // 如果是强制更新(如删除最新消息回滚)，或是更新的消息、或者是对当前最新同一条消息的状态变更
+        val isNewerOrSameMessage = forceUpdate || previous == null ||
             conversation.lastMessageTime >= previous.lastMessageTime ||
             conversation.lastMessageId == previous.lastMessageId
         val latest = if (isNewerOrSameMessage) conversation else previous

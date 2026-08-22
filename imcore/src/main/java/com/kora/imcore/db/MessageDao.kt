@@ -344,7 +344,8 @@ class MessageDao(
                         conversationDao.upsertInTransaction(
                             db,
                             remainingMessages.first().toConversation(ownerId),
-                            incrementUnread = false
+                            incrementUnread = false,
+                            forceUpdate = true
                         )
                     } else {
                         val cv = ContentValues().apply {
