@@ -8,6 +8,18 @@
 
 ---
 
+## 📸 效果预览
+
+<div align="center">
+  <img src="screenshot/Screenshot_20260822_084229.png" width="48%" />
+  <img src="screenshot/Screenshot_20260822_084252.png" width="48%" />
+  <br/>
+  <img src="screenshot/Screenshot_20260822_084336.png" width="48%" />
+  <img src="screenshot/Screenshot_20260822_084402.png" width="48%" />
+</div>
+
+---
+
 ## 🌟 核心特性
 
 - 🚀 **极简集成**：只需设置账号与初始化两步，即可拥有完整的收发消息、离线存储、会话管理与全套 UI。
