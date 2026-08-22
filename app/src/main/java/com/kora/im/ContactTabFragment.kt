@@ -1,4 +1,4 @@
-﻿package com.kora.im
+package com.kora.im
 
 import android.content.Intent
 import android.graphics.drawable.GradientDrawable
@@ -15,6 +15,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.kora.im.chat.ChatActivity
 import com.kora.imcore.constant.SessionType
+
+import android.widget.ImageView
+import com.bumptech.glide.Glide
 
 class ContactTabFragment : Fragment() {
 
@@ -45,8 +48,7 @@ class ContactTabFragment : Fragment() {
     ) : RecyclerView.Adapter<ContactAdapter.VH>() {
 
         inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
-            val flAvatar: FrameLayout = itemView.findViewById(R.id.fl_avatar)
-            val tvLetter: TextView    = itemView.findViewById(R.id.tv_avatar_letter)
+            val ivAvatar: ImageView   = itemView.findViewById(R.id.iv_avatar)
             val tvName: TextView      = itemView.findViewById(R.id.tv_nickname)
         }
 
@@ -63,12 +65,20 @@ class ContactTabFragment : Fragment() {
             val colorIndex = allAccounts.indexOf(account).coerceIn(0, DemoUsers.avatarColorRes.lastIndex)
             val colorRes = DemoUsers.avatarColorRes[colorIndex]
 
-            val bg = holder.flAvatar.background.mutate() as? GradientDrawable
+            val bg = holder.ivAvatar.background.mutate() as? GradientDrawable
                 ?: GradientDrawable().also { it.shape = GradientDrawable.OVAL }
             bg.setColor(ContextCompat.getColor(requireContext(), colorRes))
-            holder.flAvatar.background = bg
+            holder.ivAvatar.background = bg
 
-            holder.tvLetter.text = user?.nickname?.firstOrNull()?.toString() ?: "?"
+            if (user?.avatarUrl?.isNotEmpty() == true) {
+                Glide.with(holder.itemView.context)
+                    .load(user.avatarUrl)
+                    .circleCrop()
+                    .into(holder.ivAvatar)
+            } else {
+                holder.ivAvatar.setImageDrawable(null)
+            }
+
             holder.tvName.text   = user?.nickname ?: account
 
             holder.itemView.setOnClickListener { onClick(account) }

@@ -12,6 +12,9 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
+import android.widget.ImageView
+import com.bumptech.glide.Glide
+
 class LoginFragment : Fragment() {
 
     override fun onCreateView(
@@ -33,8 +36,7 @@ class LoginFragment : Fragment() {
     ) : RecyclerView.Adapter<UserAdapter.VH>() {
 
         inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
-            val flAvatar: FrameLayout = itemView.findViewById(R.id.fl_avatar)
-            val tvLetter: TextView   = itemView.findViewById(R.id.tv_avatar_letter)
+            val ivAvatar: ImageView  = itemView.findViewById(R.id.iv_avatar)
             val tvName: TextView     = itemView.findViewById(R.id.tv_nickname)
             val tvDesc: TextView     = itemView.findViewById(R.id.tv_desc)
         }
@@ -52,12 +54,20 @@ class LoginFragment : Fragment() {
             val colorRes = DemoUsers.avatarColorRes.getOrElse(position) { R.color.avatar_1 }
 
             // Tint avatar background (it's a oval shape drawable)
-            val bg = holder.flAvatar.background.mutate() as? GradientDrawable
+            val bg = holder.ivAvatar.background.mutate() as? GradientDrawable
                 ?: GradientDrawable().also { it.shape = GradientDrawable.OVAL }
             bg.setColor(ContextCompat.getColor(requireContext(), colorRes))
-            holder.flAvatar.background = bg
+            holder.ivAvatar.background = bg
 
-            holder.tvLetter.text = user?.nickname?.firstOrNull()?.toString() ?: "?"
+            if (user?.avatarUrl?.isNotEmpty() == true) {
+                Glide.with(holder.itemView.context)
+                    .load(user.avatarUrl)
+                    .circleCrop()
+                    .into(holder.ivAvatar)
+            } else {
+                holder.ivAvatar.setImageDrawable(null)
+            }
+
             holder.tvName.text   = user?.nickname ?: account
             holder.tvDesc.text   = user?.description ?: ""
 

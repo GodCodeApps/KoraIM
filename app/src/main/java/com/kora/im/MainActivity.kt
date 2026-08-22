@@ -9,11 +9,12 @@ import com.kora.imcore.ImSdkImpl
 import com.kora.imcore.constant.MsgStatus
 import com.kora.imcore.db.Message
 import com.kora.imcore.db.UserInfo
-import com.kora.imcore.provider.IMUserInfoProvider
-import com.kora.imui.ImUIKitImpl
-import com.kora.imui.IMMediaMessageSender
-import com.kora.imui.listener.SessionEventListener
 import com.kora.imcore.impl.IMMessage
+import com.kora.imcore.provider.IMUserInfoProvider
+import com.kora.imui.IMMediaMessageSender
+import com.kora.imui.ImUIKitImpl
+import com.kora.imui.listener.SessionEventListener
+import com.kora.imui.notification.IMNotificationManager
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -46,8 +47,8 @@ class MainActivity : AppCompatActivity() {
         ImSdkImpl.setAccount(account)
         IMClient.init(applicationContext, SERVER_HOST, SERVER_PORT)
         ImUIKitImpl.setMediaMessageProvider(AppMediaMessageProvider())
-        com.kora.imui.notification.IMNotificationManager.init(this, com.kora.im.chat.ChatActivity::class.java)
-        com.kora.imui.notification.IMNotificationManager.requestNotificationPermission(this)
+        IMNotificationManager.init(this, com.kora.im.chat.ChatActivity::class.java)
+        IMNotificationManager.requestNotificationPermission(this)
         IMClient.userInfoProvider = object : IMUserInfoProvider {
             override fun getUserInfo(account: String): UserInfo? = DemoUsers.info(account)
             override fun fetchUserInfoFromServer(account: String, callback: (UserInfo?) -> Unit) {
@@ -108,18 +109,49 @@ data class DemoUserInfo(
     val account: String,
     val nickname: String,
     val description: String,
-    val avatarColor: Int   // color resource id
+    val avatarColor: Int,   // color resource id
+    val avatarUrl: String
 )
 
 object DemoUsers {
     val accounts = listOf("test1", "test2", "test3", "test4", "test5")
 
     private val users = listOf(
-        DemoUserInfo("test1", "陈晨",   "产品经理 · 北京",    android.R.color.holo_blue_light),
-        DemoUserInfo("test2", "林小雨",  "UI 设计师 · 上海",  android.R.color.holo_red_light),
-        DemoUserInfo("test3", "王思博",  "后端工程师 · 杭州", android.R.color.holo_orange_light),
-        DemoUserInfo("test4", "赵雨桐",  "数据分析师 · 深圳", android.R.color.holo_blue_dark),
-        DemoUserInfo("test5", "刘宇飞",  "前端工程师 · 成都", android.R.color.holo_purple)
+        DemoUserInfo(
+            "test1",
+            "陈晨",
+            "产品经理 · 北京",
+            android.R.color.holo_blue_light,
+            "https://img0.baidu.com/it/u=4090671433,2993438630&fm=253&fmt=auto?w=830&h=800"
+        ),
+        DemoUserInfo(
+            "test2",
+            "林小雨",
+            "UI 设计师 · 上海",
+            android.R.color.holo_red_light,
+            "https://img0.baidu.com/it/u=2678472382,3134615811&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=500"
+        ),
+        DemoUserInfo(
+            "test3",
+            "王思博",
+            "后端工程师 · 杭州",
+            android.R.color.holo_orange_light,
+            "https://img0.baidu.com/it/u=2894886765,3228418388&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=500"
+        ),
+        DemoUserInfo(
+            "test4",
+            "赵雨桐",
+            "数据分析师 · 深圳",
+            android.R.color.holo_blue_dark,
+            "https://img2.baidu.com/it/u=2398229740,959087329&fm=253&fmt=auto&app=120&f=JPEG?w=800&h=800"
+        ),
+        DemoUserInfo(
+            "test5",
+            "刘宇飞",
+            "前端工程师 · 成都",
+            android.R.color.holo_purple,
+            "https://img1.baidu.com/it/u=1945685654,1523484003&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=500"
+        )
     )
 
     private val userMap = users.associateBy { it.account }
@@ -127,7 +159,7 @@ object DemoUsers {
     fun demoUser(account: String): DemoUserInfo? = userMap[account]
 
     fun info(account: String): UserInfo? =
-        userMap[account]?.let { UserInfo(it.account, it.nickname, "") }
+        userMap[account]?.let { UserInfo(it.account, it.nickname, it.avatarUrl) }
 
     /** Avatar background color resource ids in order (index 0..4) */
     val avatarColorRes = listOf(

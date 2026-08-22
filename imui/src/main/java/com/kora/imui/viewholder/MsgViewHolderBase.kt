@@ -142,24 +142,35 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
         val defaultAvatarRes = R.drawable.ic_default_avatar
         val targetAvatarView = if (isReceivedMsg()) leftAvatar else rightAvatar
 
-        // 1. 列表复用时，先立刻展示默认头像，防止头像错乱闪烁
         targetAvatarView?.let { imageView ->
-            Glide.with(itemView.context)
-                .load(defaultAvatarRes)
-                .circleCrop()
-                .into(imageView)
-        }
-        // 2. 异步/同步获取用户信息
-        val boundMessageId = mMessage?.getMsgId()
-        itemView.post {
-            val launch = itemView.findViewTreeLifecycleOwner()
-            launch?.lifecycleScope?.launch {
-                val userInfo = IMClient.getUserInfo(account)
-                if (mMessage?.getMsgId() != boundMessageId) return@launch
-                val avatarUrl = userInfo?.avatar
-                targetAvatarView?.let { imageView ->
+            val boundMessageId = mMessage?.getMsgId()
+            // 1. 尝试通过 Provider 同步获取（最快，没有延迟，完美配合 Glide 内存缓存）
+            val syncInfo = account?.let { IMClient.userInfoProvider?.getUserInfo(it) }
+            if (syncInfo != null && !syncInfo.avatar.isNullOrEmpty()) {
+                Glide.with(itemView.context)
+                    .load(syncInfo.avatar)
+                    .placeholder(defaultAvatarRes)
+                    .error(defaultAvatarRes)
+                    .circleCrop()
+                    .into(imageView)
+            } else if (syncInfo != null) {
+                Glide.with(itemView.context)
+                    .load(defaultAvatarRes)
+                    .circleCrop()
+                    .into(imageView)
+            } else {
+                // 2. 如果 Provider 也没有，先展示占位图，防止滑动复用时显示错乱头像
+                Glide.with(itemView.context)
+                    .load(defaultAvatarRes)
+                    .circleCrop()
+                    .into(imageView)
+
+                // 3. 异步去 DB 或网络拉取
+                itemView.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
+                    val userInfo = IMClient.getUserInfo(account)
+                    if (mMessage?.getMsgId() != boundMessageId) return@launch
+                    val avatarUrl = userInfo?.avatar
                     if (!avatarUrl.isNullOrEmpty()) {
-                        // 使用 Glide 加载网络或本地路径头像，带有占位图和错误图
                         Glide.with(itemView.context)
                             .load(avatarUrl)
                             .placeholder(defaultAvatarRes)
@@ -167,9 +178,9 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                             .circleCrop()
                             .into(imageView)
                     } else {
-                        // 明确没有头像数据，确保展示默认头像
                         Glide.with(itemView.context)
                             .load(defaultAvatarRes)
+                            .circleCrop()
                             .into(imageView)
                     }
                 }
