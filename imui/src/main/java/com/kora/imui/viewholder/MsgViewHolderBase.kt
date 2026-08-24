@@ -127,7 +127,7 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                 if (customResend != null) {
                     customResend.invoke(message)
                 } else {
-                    itemView.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
+                    launchWhenAttached(itemView) {
                         if (IMMediaMessageSender.isMedia(message.getMessage())) {
                             IMMediaMessageSender.enqueue(message.getMessage())
                         } else {
@@ -168,9 +168,9 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                     .into(imageView)
 
                 // 3. 异步去 DB 或网络拉取
-                itemView.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
+                launchWhenAttached(itemView) {
                     val userInfo = IMClient.getUserInfo(account)
-                    if (mMessage?.getMsgId() != boundMessageId) return@launch
+                    if (mMessage?.getMsgId() != boundMessageId) return@launchWhenAttached
                     val avatarUrl = userInfo?.avatar
                     if (!avatarUrl.isNullOrEmpty()) {
                         Glide.with(itemView.context)
@@ -284,7 +284,7 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                 .setTitle("删除消息")
                 .setMessage("确定删除这条消息吗？")
                 .setPositiveButton("删除") { _, _ ->
-                    itemView.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
+                    launchWhenAttached(itemView) {
                         IMClient.deleteMessage(msg.getMsgId())
                     }
                 }
@@ -297,5 +297,22 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                 actions.getOrNull(which)?.invoke()
             }
             .show()
+    }
+
+    protected fun launchWhenAttached(view: View, block: suspend kotlinx.coroutines.CoroutineScope.() -> Unit) {
+        val owner = view.findViewTreeLifecycleOwner()
+        if (owner != null) {
+            owner.lifecycleScope.launch(block = block)
+        } else {
+            view.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) {
+                    v.removeOnAttachStateChangeListener(this)
+                    v.findViewTreeLifecycleOwner()?.lifecycleScope?.launch(block = block)
+                }
+                override fun onViewDetachedFromWindow(v: View) {
+                    v.removeOnAttachStateChangeListener(this)
+                }
+            })
+        }
     }
 }

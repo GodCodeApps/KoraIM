@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
         IMNotificationManager.init(this, com.kora.im.chat.ChatActivity::class.java)
         IMNotificationManager.requestNotificationPermission(this)
         IMClient.userInfoProvider = object : IMUserInfoProvider {
-            override fun getUserInfo(account: String): UserInfo? = DemoUsers.info(account)
+            override fun getUserInfo(account: String): UserInfo? = null
             override fun fetchUserInfoFromServer(account: String, callback: (UserInfo?) -> Unit) {
                 callback(DemoUsers.info(account))
             }
@@ -98,7 +98,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         // Development machine's WLAN address. The phone and computer must be on
         // the same LAN; update this value if the computer's DHCP address changes.
-        private const val SERVER_HOST = "192.168.1.9"
+        private const val SERVER_HOST = "192.168.1.6"
         private const val SERVER_PORT = 8090
         private const val STATE_ACCOUNT = "current_account"
     }
