@@ -7,6 +7,9 @@ class LocationAttachment : MsgAttachment {
     var latitude: Double = 0.0
     var longitude: Double = 0.0
     var address: String = ""
+    var title: String = ""
+    var snapshotPath: String = ""
+    var remoteSnapshotUrl: String = ""
 
     constructor()
 
@@ -16,6 +19,9 @@ class LocationAttachment : MsgAttachment {
             latitude = jsonObj.optDouble("latitude", 0.0)
             longitude = jsonObj.optDouble("longitude", 0.0)
             address = jsonObj.optString("address", "")
+            title = jsonObj.optString("title", "")
+            snapshotPath = jsonObj.optString("snapshotPath", "")
+            remoteSnapshotUrl = jsonObj.optString("remoteSnapshotUrl", "")
         }
     }
 
@@ -24,6 +30,10 @@ class LocationAttachment : MsgAttachment {
             put("latitude", latitude)
             put("longitude", longitude)
             put("address", address)
+            put("title", title)
+            // local path should not be sent over network
+            if (!send) put("snapshotPath", snapshotPath)
+            put("remoteSnapshotUrl", remoteSnapshotUrl)
         }.toString()
     }
 

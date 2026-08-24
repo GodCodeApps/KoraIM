@@ -11,15 +11,44 @@ class MsgLocationViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
     override fun getLayout(): Int = R.layout.item_msg_location
 
     override fun bindViewHolder(view: View, message: IMMessage) {
+        val tvTitle = view.findViewById<TextView>(R.id.tv_title)
         val tvAddress = view.findViewById<TextView>(R.id.tv_address)
         val ivMap = view.findViewById<ImageView>(R.id.iv_map)
 
         val attachment = message.getAttachment() as? LocationAttachment ?: return
-        tvAddress.text = attachment.address
+        
+        tvTitle.text = attachment.title
+        if (attachment.address.isNotEmpty()) {
+            tvAddress.text = attachment.address
+            tvAddress.visibility = View.VISIBLE
+        } else {
+            tvAddress.visibility = View.GONE
+        }
 
-        // In a real app, you would load a static map image from Amap/Baidu using Glide here.
-        // For now, we'll just set a placeholder image.
-        ivMap.setImageResource(R.drawable.ic_more_location)
-        ivMap.scaleType = ImageView.ScaleType.CENTER
+        // Load remote snapshot if available, else local snapshot, else placeholder
+        val imgUrl = if (attachment.remoteSnapshotUrl.isNotEmpty()) attachment.remoteSnapshotUrl else attachment.snapshotPath
+        if (imgUrl.isNotEmpty()) {
+            com.bumptech.glide.Glide.with(ivMap.context)
+                .load(imgUrl)
+                .centerCrop()
+                .placeholder(R.drawable.im_bg_card)
+                .into(ivMap)
+        } else {
+            ivMap.setImageResource(R.drawable.im_bg_card)
+        }
+
+        view.setOnClickListener {
+            try {
+                val clazz = Class.forName("com.xhx.circle.friends.feature.message.ui.LocationViewActivity")
+                val intent = android.content.Intent(view.context, clazz)
+                intent.putExtra("latitude", attachment.latitude)
+                intent.putExtra("longitude", attachment.longitude)
+                intent.putExtra("title", attachment.title)
+                intent.putExtra("address", attachment.address)
+                view.context.startActivity(intent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 }

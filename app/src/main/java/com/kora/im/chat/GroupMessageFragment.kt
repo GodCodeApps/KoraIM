@@ -24,8 +24,10 @@ class GroupMessageFragment : IMessageFragment() {
         val context = context ?: return
         val content = android.view.LayoutInflater.from(context)
             .inflate(com.kora.im.R.layout.dialog_send_red_packet, null, false)
-        val amountInput = content.findViewById<android.widget.EditText>(com.kora.im.R.id.et_red_packet_amount)
-        val greetingInput = content.findViewById<android.widget.EditText>(com.kora.im.R.id.et_red_packet_greeting)
+        val amountInput =
+            content.findViewById<android.widget.EditText>(com.kora.im.R.id.et_red_packet_amount)
+        val greetingInput =
+            content.findViewById<android.widget.EditText>(com.kora.im.R.id.et_red_packet_greeting)
         val dialog = androidx.appcompat.app.AlertDialog.Builder(context)
             .setTitle("发红包")
             .setView(content)
@@ -68,7 +70,11 @@ class GroupMessageFragment : IMessageFragment() {
                     if (sendMessage(message)) {
                         dialog.dismiss()
                     } else {
-                        android.widget.Toast.makeText(context, "红包发送失败", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(
+                            context,
+                            "红包发送失败",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             }
@@ -87,7 +93,9 @@ class GroupMessageFragment : IMessageFragment() {
                     receiverId = if (!peerId.isNullOrEmpty()) peerId else sessionId,
                     latitude = 30.5432,
                     longitude = 104.0623,
-                    address = "成都市武侯区天府软件园"
+                    title = "天府软件园",
+                    address = "成都市武侯区天府软件园",
+                    snapshotPath = ""
                 )
                 sendMessage(msg)
             }

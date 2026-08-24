@@ -113,7 +113,10 @@ public class P2PChatFragment extends IMessageFragment {
                                 getSessionId(),
                                 getSessionType(),
                                 getPeerId() != null && !getPeerId().isEmpty() ? getPeerId() : getSessionId(),
-                                30.5432, 104.0623, "成都市武侯区天府软件园"
+                                30.5432, 104.0623,
+                              "天府软件园",
+                             "成都市武侯区天府软件园",
+                             ""
                         );
                         sendMessage(msg);
                     }

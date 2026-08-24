@@ -66,7 +66,9 @@ object MessageBuilder {
         receiverId: String,
         latitude: Double,
         longitude: Double,
-        address: String
+        title: String,
+        address: String,
+        snapshotPath: String
     ): IMMessage = Message(
         sessionId = sessionId,
         sessionType = sessionType,
@@ -79,8 +81,10 @@ object MessageBuilder {
         attachment = com.kora.imui.attachment.LocationAttachment().apply {
             this.latitude = latitude
             this.longitude = longitude
+            this.title = title
             this.address = address
-        }.toJson(true)
+            this.snapshotPath = snapshotPath
+        }.toJson(false)
     )
 
     /** 创建视频消息 */

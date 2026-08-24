@@ -10,7 +10,7 @@
         android:id="@+id/fl_title_bar"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="#07C160">
+        android:background="#EDEDED">
 
         <ImageView
             android:id="@+id/iv_back"

@@ -106,10 +106,25 @@ object IMMediaMessageSender {
                     }
                     message.attachment = attachment.toJson(true)
                 }
+                com.kora.imui.attachment.LocationAttachment.TYPE_LOCATION -> {
+                    val attachment = com.kora.imui.attachment.LocationAttachment(message.attachment)
+                    if (attachment.remoteSnapshotUrl.isBlank() && attachment.snapshotPath.isNotBlank()) {
+                        val result = provider.uploadImage(
+                            ImageUploadRequest(
+                                attachment.snapshotPath, 0, 0,
+                                0, "image/png"
+                            )
+                        )
+                        if (result.remoteUrl.isNotBlank()) {
+                            attachment.remoteSnapshotUrl = result.remoteUrl
+                        }
+                    }
+                    message.attachment = attachment.toJson(true)
+                }
                 else -> error("Message is not a supported media type")
         }
     }
 
     fun isMedia(message: Message): Boolean =
-        message.type == MsgType.IMAGE || message.type == MsgType.VIDEO || message.type == MsgType.VOICE
+        message.type == MsgType.IMAGE || message.type == MsgType.VIDEO || message.type == MsgType.VOICE || message.type == com.kora.imui.attachment.LocationAttachment.TYPE_LOCATION
 }
