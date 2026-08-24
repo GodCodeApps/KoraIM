@@ -67,10 +67,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun configureMessageActions() {
         ImUIKitImpl.setSessionEventListener(SessionEventListener().apply {
-            onAvatarClickListener { account: String? ->
+            onAvatarClickListener { view, account: String? ->
                 Toast.makeText(this@MainActivity, account.orEmpty(), Toast.LENGTH_SHORT).show()
             }
-            onResendClickListener { message: IMMessage? ->
+            onResendClickListener { view, message: IMMessage? ->
                 (message as? Message)?.let {
                     lifecycleScope.launch {
                         if (IMMediaMessageSender.isMedia(it)) {

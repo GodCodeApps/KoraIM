@@ -122,10 +122,10 @@ IMClient.userInfoProvider = object : IMUserInfoProvider {
 
 // 5. 配置会话全局事件监听（头像点击、失败重发等）
 ImUIKitImpl.setSessionEventListener(SessionEventListener().apply {
-    onAvatarClickListener { account: String? ->
+    onAvatarClickListener { view, account: String? ->
         Toast.makeText(context, "点击了用户头像: $account", Toast.LENGTH_SHORT).show()
     }
-    onResendClickListener { message: IMMessage? ->
+    onResendClickListener { view, message: IMMessage? ->
         (message as? Message)?.let {
             lifecycleScope.launch {
                 if (IMMediaMessageSender.isMedia(it)) {

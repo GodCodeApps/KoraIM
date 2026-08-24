@@ -125,7 +125,7 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                 if (message.getMsgStatus() != MsgStatus.FAIL) return@setOnClickListener
                 val customResend = ImUIKitImpl.getSessionListener()?.getResendClickListener()
                 if (customResend != null) {
-                    customResend.invoke(message)
+                    customResend.invoke(it, message)
                 } else {
                     launchWhenAttached(itemView) {
                         if (IMMediaMessageSender.isMedia(message.getMessage())) {
@@ -191,34 +191,34 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
 
         contentContainer?.setOnClickListener {
             ImUIKitImpl.getSessionListener()?.getItemClickListener()?.invoke(
-                mMessage
+                it, mMessage
             )
         }
         contentContainer?.setOnLongClickListener {
-            val consumed = ImUIKitImpl.getSessionListener()?.getItemLongClickListener()?.invoke(mMessage) ?: false
+            val consumed = ImUIKitImpl.getSessionListener()?.getItemLongClickListener()?.invoke(it, mMessage) ?: false
             if (consumed) return@setOnLongClickListener true
             showDefaultMessageActionDialog(itemView.context, mMessage)
             true
         }
         leftAvatar?.setOnClickListener {
             ImUIKitImpl.getSessionListener()?.getAvatarClickListener()?.invoke(
-                mMessage?.senderId
+                it, mMessage?.senderId
             )
         }
         leftAvatar?.setOnLongClickListener {
             ImUIKitImpl.getSessionListener()?.getAvatarLongClickListener()?.invoke(
-                mMessage?.senderId
+                it, mMessage?.senderId
             )
             true
         }
         rightAvatar?.setOnClickListener {
             ImUIKitImpl.getSessionListener()?.getAvatarClickListener()?.invoke(
-                mMessage?.senderId
+                it, mMessage?.senderId
             )
         }
         rightAvatar?.setOnLongClickListener {
             ImUIKitImpl.getSessionListener()?.getAvatarLongClickListener()?.invoke(
-                mMessage?.senderId
+                it, mMessage?.senderId
             )
             true
         }
