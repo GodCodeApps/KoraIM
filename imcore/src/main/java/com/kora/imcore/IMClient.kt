@@ -113,6 +113,7 @@ object IMClient {
         IMRuntime.messages = messageRepository
         IMRuntime.ownerId = account
         IMRuntime.syncCursor = syncCursor
+        messageRepository.markStaleOutgoingAsFailed(account)
         ImSdkImpl.init()
         connectionManager = ConnectionManager(appContext).also { it.connect(host, port, account, syncCursor) }
     }

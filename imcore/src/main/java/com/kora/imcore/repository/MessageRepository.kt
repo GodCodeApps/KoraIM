@@ -37,6 +37,9 @@ internal class MessageRepository(private val dao: MessageDao) {
     /** 批量插入或更新消息 */
     suspend fun upsertAll(messages: List<Message>) = dao.insertMessageList(messages)
 
+    fun markStaleOutgoingAsFailed(ownerId: String): Int =
+        dao.markStaleOutgoingAsFailed(ownerId)
+
     /**
      * 确认消息（发送成功/收到新消息时调用）。
      * 会更新消息状态、关联会话、更新会话的最后消息预览和未读计数。

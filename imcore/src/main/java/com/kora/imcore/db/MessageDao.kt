@@ -274,6 +274,38 @@ class MessageDao(
         return parseMessageList(cursor).firstOrNull()
     }
 
+    /** Mark messages left in SENDING after a previous process death as failed. */
+    fun markStaleOutgoingAsFailed(ownerId: String): Int {
+        val db = dbHelper.writableDatabase
+        var changed = 0
+        db.beginTransaction()
+        try {
+            changed = db.update(
+                ImAppDatabaseHelper.TABLE_MESSAGE,
+                ContentValues().apply { put(ImAppDatabaseHelper.COLUMN_STATUS, MsgStatus.FAIL) },
+                "${ImAppDatabaseHelper.COLUMN_DIRECT} = ? AND ${ImAppDatabaseHelper.COLUMN_STATUS} = ? " +
+                    "AND ${ImAppDatabaseHelper.COLUMN_SENDER_ID} = ?",
+                arrayOf(MsgDirection.OUT.toString(), MsgStatus.SENDING.toString(), ownerId)
+            )
+            // Keep the conversation preview consistent with the message row.
+            db.execSQL(
+                "UPDATE ${ImAppDatabaseHelper.TABLE_CONVERSATION} SET lastMessageStatus = ? " +
+                    "WHERE ownerId = ? AND lastMessageId IN (SELECT messageId FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} " +
+                    "WHERE direct = ? AND status = ? AND senderId = ?)",
+                arrayOf(
+                    MsgStatus.FAIL.toString(), ownerId,
+                    MsgDirection.OUT.toString(), MsgStatus.FAIL.toString(), ownerId
+                )
+            )
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+            conversationDao.notifyChanged()
+            notifyChange()
+        }
+        return changed
+    }
+
     suspend fun insertMessage(vararg message: Message) = withContext(Dispatchers.IO) {
         val db = dbHelper.writableDatabase
         db.beginTransaction()
