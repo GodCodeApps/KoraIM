@@ -28,6 +28,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.bumptech.glide.Glide
 
 /**
  * IM 消息通知管理器：
@@ -221,16 +223,29 @@ object IMNotificationManager {
         val content = ConversationDigestFormatter.formatMessage(message)
 
         // 5. 构建并弹出通知
-        showNotification(context, message, title, content)
+        showNotification(context, message, title, content, userInfo?.avatar)
     }
 
-    private fun showNotification(context: Context, message: Message, title: String, content: String) {
+    private suspend fun showNotification(
+        context: Context,
+        message: Message,
+        title: String,
+        content: String,
+        avatarUrl: String?
+    ) {
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
             return
         }
 
         val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-        val defaultAvatarBitmap = BitmapFactory.decodeResource(context.resources, R.drawable.ic_default_avatar)
+        // Notification large icons must be actual Bitmaps. Download off the main thread;
+        // missing/invalid avatars fall back to the app logo.
+        val largeIcon = withContext(Dispatchers.IO) {
+            val remote = avatarUrl?.takeIf { it.isNotBlank() }?.let {
+                runCatching { Glide.with(context).asBitmap().load(it).submit(128, 128).get() }.getOrNull()
+            }
+            remote ?: BitmapFactory.decodeResource(context.resources, R.drawable.ic_launcher_foreground)
+        }
 
         // 构造点击跳转 Intent
         val clickIntent = if (targetChatActivityClass != null) {
@@ -263,7 +278,7 @@ object IMNotificationManager {
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_default_avatar)
-            .setLargeIcon(defaultAvatarBitmap)
+            .setLargeIcon(largeIcon)
             .setContentTitle(title)
             .setContentText(content)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
