@@ -7,6 +7,7 @@ import com.kora.imui.attachment.TextAttachment
 import com.kora.imui.attachment.UnknownAttachment
 import com.kora.imui.attachment.VoiceAttachment
 import com.kora.imui.attachment.VideoAttachment
+import com.kora.imui.attachment.FileAttachment
 import com.kora.imui.attachment.RedPacketAttachment
 import com.kora.imui.attachment.TipAttachment
 import kotlin.collections.get
@@ -22,6 +23,7 @@ object MsgViewHolderFactory {
             ImageAttachment::class.java to MsgImageViewHolder::class.java,
             VoiceAttachment::class.java to MsgVoiceViewHolder::class.java,
             VideoAttachment::class.java to MsgVideoViewHolder::class.java,
+            FileAttachment::class.java to MsgFileViewHolder::class.java,
             RedPacketAttachment::class.java to MsgRedPacketViewHolder::class.java,
             TipAttachment::class.java to MsgTipViewHolder::class.java,
             com.kora.imui.attachment.CardAttachment::class.java to MsgCardViewHolder::class.java,

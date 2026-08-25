@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import com.kora.imcore.netty.SyncEvent
 import com.kora.imcore.constant.MsgDirection
+import com.kora.imcore.provider.IMConversationDigestProvider
 import com.kora.imcore.constant.MsgType
 import org.json.JSONObject
 
@@ -23,7 +24,8 @@ import org.json.JSONObject
  */
 class MessageDao(
     private val dbHelper: ImAppDatabaseHelper,
-    private val conversationDao: ConversationDao = ConversationDao(dbHelper)
+    private val conversationDao: ConversationDao = ConversationDao(dbHelper),
+    var digestProvider: IMConversationDigestProvider? = null
 ) {
 
     private fun Message.toConversation(ownerId: String) = Conversation(
@@ -34,20 +36,7 @@ class MessageDao(
         lastMessageId = messageId,
         lastMessageType = type,
         lastMessageStatus = status,
-        lastMessagePreview = when (type) {
-            MsgType.TEXT -> runCatching { JSONObject(attachment).optString("content") }.getOrDefault("")
-            MsgType.IMAGE -> "[图片]"
-            MsgType.VIDEO -> "[视频]"
-            MsgType.VOICE -> "[语音]"
-            MsgType.RED_PACKET -> "[红包]"
-            MsgType.TIP -> runCatching { JSONObject(attachment).optString("content") }.getOrDefault("[提示消息]")
-            1001 -> {
-                val nickname = runCatching { JSONObject(attachment).optString("nickname") }.getOrDefault("")
-                if (nickname.isNotBlank()) "[个人名片] $nickname" else "[个人名片]"
-            }
-            1002 -> "[位置]"
-            else -> "[消息]"
-        },
+        lastMessagePreview = digestProvider?.format(this, ownerId) ?: "[消息]",
         lastMessageTime = time,
         updateTime = time
     )

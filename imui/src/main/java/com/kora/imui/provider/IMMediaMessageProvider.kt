@@ -34,6 +34,9 @@ data class VoiceUploadRequest(
 
 data class VoiceUploadResult(val remoteUrl: String)
 
+data class FileUploadRequest(val localPath: String, val name: String, val size: Long, val mimeType: String)
+data class FileUploadResult(val remoteUrl: String)
+
 /**
  * 多媒体文件上传 SPI 接口：
  * 由业务宿主 App 实现，负责将本地文件上传到业务 OSS/文件服务器并返回远程访问 URL。
@@ -47,5 +50,9 @@ interface IMMediaMessageProvider {
 
     /** 上传语音并返回远程音频 URL */
     suspend fun uploadVoice(request: VoiceUploadRequest): VoiceUploadResult
+
+    /** Upload a generic file. The default keeps existing providers source-compatible. */
+    suspend fun uploadFile(request: FileUploadRequest): FileUploadResult =
+        error("File upload is not supported by this provider")
 }
 

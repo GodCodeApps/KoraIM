@@ -3,6 +3,7 @@ package com.kora.imui
 import android.text.TextUtils
 import android.view.View
 import android.widget.Toast
+import android.provider.OpenableColumns
 import androidx.fragment.app.Fragment
 import com.kora.imcore.ImSdkImpl
 import com.kora.imcore.constant.MsgDirection
@@ -16,6 +17,7 @@ import com.kora.imui.R
 import com.kora.imui.attachment.VoiceAttachment
 import com.kora.imui.attachment.VideoAttachment
 import com.kora.imui.attachment.RedPacketAttachment
+import com.kora.imui.attachment.FileAttachment
 import com.kora.imui.bean.BaseInputAction
 import com.kora.imui.inputbox.ChatInputView
 import com.kora.imui.inputbox.ChatInputView.OnInputListener
@@ -28,7 +30,10 @@ import com.luck.picture.lib.interfaces.OnResultCallbackListener
 import com.kora.imcore.constant.MsgStatus
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.kora.imui.IMMediaMessageSender
+import androidx.activity.result.contract.ActivityResultContracts
 
 
 /**
@@ -54,6 +59,34 @@ class InputPanel(
         sessionId = value
     }
     private val chatInputView = rootView.findViewById<ChatInputView>(R.id.chat_input_view)
+    private val filePicker = fragment.registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@registerForActivityResult
+        val resolver = fragment.requireContext().contentResolver
+        var name = "文件"
+        var size = 0L
+        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
+            if (c.moveToFirst()) {
+                c.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf { it >= 0 }?.let { name = c.getString(it) ?: name }
+                c.getColumnIndex(OpenableColumns.SIZE).takeIf { it >= 0 && !c.isNull(it) }?.let { size = c.getLong(it) }
+            }
+        }
+        val mimeType = resolver.getType(uri) ?: "application/octet-stream"
+        fragment.viewLifecycleOwner.lifecycleScope.launch {
+            val localPath = withContext(Dispatchers.IO) {
+                val safeName = name.replace(Regex("[^A-Za-z0-9._-]"), "_")
+                val target = java.io.File(fragment.requireContext().cacheDir, "im_file_${System.currentTimeMillis()}_$safeName")
+                resolver.openInputStream(uri)?.use { input -> target.outputStream().use { output -> input.copyTo(output) } }
+                target.absolutePath.takeIf { target.exists() }
+            } ?: return@launch
+            val attachment = FileAttachment().apply {
+                this.localPath = localPath
+                this.name = name
+                this.size = size
+                this.mimeType = mimeType
+            }
+            queueMediaMessage(MessageBuilder.createFileMessage(sessionId, sessionType, peerId.ifBlank { sessionId }, attachment).getMessage())
+        }
+    }
 
     private var onMoreActionClickListener: ((Int) -> Unit)? = null
     fun setActionClickListener(cb: (res: Int) -> Unit) {
@@ -219,6 +252,9 @@ class InputPanel(
                             override fun onCancel() {
                             }
                         })
+                    return
+                } else if (optionName.equals("文件")) {
+                    filePicker.launch(arrayOf("*/*"))
                     return
                 }
 

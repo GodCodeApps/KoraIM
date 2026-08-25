@@ -92,6 +92,7 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
         }
         val isMedia = mMessage?.getMsgType() == MsgType.IMAGE ||
             mMessage?.getMsgType() == MsgType.VIDEO ||
+            mMessage?.getMsgType() == com.kora.imui.attachment.FileAttachment.TYPE_FILE ||
             mMessage?.getMsgType() == MsgType.RED_PACKET ||
             mMessage?.getMsgType() == com.kora.imui.attachment.CardAttachment.TYPE_CARD ||
             mMessage?.getMsgType() == com.kora.imui.attachment.LocationAttachment.TYPE_LOCATION

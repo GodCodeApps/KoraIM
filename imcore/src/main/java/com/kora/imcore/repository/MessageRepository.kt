@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import com.kora.imcore.netty.SyncEvent
+import com.kora.imcore.provider.IMConversationDigestProvider
 
 /**
  * 消息数据仓库，封装 [MessageDao] 的操作并统一在 IO 线程执行。
@@ -15,6 +16,10 @@ import com.kora.imcore.netty.SyncEvent
  * - **操作（upsert/page/confirm）**：挂起函数，执行一次性读写
  */
 internal class MessageRepository(private val dao: MessageDao) {
+
+    fun setDigestProvider(provider: IMConversationDigestProvider?) {
+        dao.digestProvider = provider
+    }
 
     /** 按会话 ID 观察消息列表（实时更新） */
     fun observeSession(sessionId: String): Flow<List<Message>> =

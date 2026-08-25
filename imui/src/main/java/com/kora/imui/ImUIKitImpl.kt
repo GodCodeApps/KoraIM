@@ -2,12 +2,17 @@ package com.kora.imui
 
 import com.kora.imui.listener.SessionEventListener
 import com.kora.imui.provider.IMMediaMessageProvider
+import com.kora.imcore.IMClient
+import com.kora.imui.provider.ConversationDigestFormatter
 
 /**
  * IM UI 组件库全局配置入口（单例）。
  * 用于设置全局点击事件监听器与多媒体上传提供器。
  */
 object ImUIKitImpl {
+    init {
+        IMClient.conversationDigestProvider = ConversationDigestFormatter
+    }
     private var sessionEventListener: SessionEventListener? = null
     private var mediaMessageProvider: IMMediaMessageProvider? = null
 

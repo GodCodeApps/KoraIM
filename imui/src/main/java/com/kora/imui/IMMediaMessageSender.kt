@@ -7,6 +7,7 @@ import com.kora.imcore.db.Message
 import com.kora.imui.attachment.ImageAttachment
 import com.kora.imui.attachment.VideoAttachment
 import com.kora.imui.attachment.VoiceAttachment
+import com.kora.imui.attachment.FileAttachment
 import com.kora.imui.provider.ImageUploadRequest
 import com.kora.imui.provider.VideoUploadRequest
 import com.kora.imui.provider.VoiceUploadRequest
@@ -106,6 +107,15 @@ object IMMediaMessageSender {
                     }
                     message.attachment = attachment.toJson(true)
                 }
+                FileAttachment.TYPE_FILE -> {
+                    val attachment = FileAttachment(message.attachment)
+                    // File messages are transport-only here. The host app may upload the
+                    // file separately; imui sends the selected path and metadata as-is.
+                    require(attachment.localPath.isNotBlank() || attachment.remoteUrl.isNotBlank()) {
+                        "File path or remoteUrl is empty"
+                    }
+                    message.attachment = attachment.toJson(false)
+                }
                 com.kora.imui.attachment.LocationAttachment.TYPE_LOCATION -> {
                     val attachment = com.kora.imui.attachment.LocationAttachment(message.attachment)
                     if (attachment.remoteSnapshotUrl.isBlank() && attachment.snapshotPath.isNotBlank()) {
@@ -126,5 +136,5 @@ object IMMediaMessageSender {
     }
 
     fun isMedia(message: Message): Boolean =
-        message.type == MsgType.IMAGE || message.type == MsgType.VIDEO || message.type == MsgType.VOICE || message.type == com.kora.imui.attachment.LocationAttachment.TYPE_LOCATION
+        message.type == MsgType.IMAGE || message.type == MsgType.VIDEO || message.type == MsgType.VOICE || message.type == FileAttachment.TYPE_FILE || message.type == com.kora.imui.attachment.LocationAttachment.TYPE_LOCATION
 }

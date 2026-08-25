@@ -14,6 +14,7 @@ import com.kora.imcore.event.ConnectionState
 import com.kora.imcore.event.IMEventHub
 import com.kora.imcore.impl.IMMessage
 import com.kora.imcore.provider.IMUserInfoProvider
+import com.kora.imcore.provider.IMConversationDigestProvider
 import com.kora.imcore.repository.MessageRepository
 import com.kora.imcore.repository.UserRepository
 import kotlinx.coroutines.flow.Flow
@@ -87,6 +88,12 @@ object IMClient {
             userRepository.provider = value
         }
 
+    var conversationDigestProvider: IMConversationDigestProvider? = null
+        set(value) {
+            field = value
+            if (::messageRepository.isInitialized) messageRepository.setDigestProvider(value)
+        }
+
     /**
      * 初始化 IM SDK。内部流程：
      * 1. 创建 SQLite 数据库（消息、会话、用户、同步游标）
@@ -108,7 +115,9 @@ object IMClient {
         val database = ImAppDatabaseHelper(appContext)
         val syncCursor = SyncStateDao(database).getCursor(account)
         conversationDao = ConversationDao(database)
-        messageRepository = MessageRepository(MessageDao(database, conversationDao))
+        messageRepository = MessageRepository(MessageDao(database, conversationDao).also {
+            it.digestProvider = conversationDigestProvider
+        })
         userRepository = UserRepository(UserDao(database), IMRuntime.scope)
         IMRuntime.messages = messageRepository
         IMRuntime.ownerId = account

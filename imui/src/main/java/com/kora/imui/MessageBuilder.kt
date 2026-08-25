@@ -9,6 +9,7 @@ import com.kora.imcore.impl.IMMessage
 import com.kora.imui.attachment.ImageAttachment
 import com.kora.imui.attachment.TextAttachment
 import com.kora.imui.attachment.VideoAttachment
+import com.kora.imui.attachment.FileAttachment
 import com.kora.imui.attachment.RedPacketAttachment
 import com.kora.imcore.constant.MsgStatus
 
@@ -16,6 +17,13 @@ import com.kora.imcore.constant.MsgStatus
  * 消息构建工厂，提供各类消息（文本、图片、视频、红包、提示）的便捷创建方法。
  */
 object MessageBuilder {
+
+    fun createFileMessage(sessionId: String, @SessionType sessionType: Int, receiverId: String, attachment: FileAttachment): IMMessage = Message(
+        sessionId = sessionId, sessionType = sessionType,
+        senderId = ImSdkImpl.getAccount() ?: "", receiverId = receiverId,
+        type = FileAttachment.TYPE_FILE, direct = MsgDirection.OUT, status = MsgStatus.SENDING,
+        time = System.currentTimeMillis(), attachment = attachment.toJson(false)
+    )
 
     /** 创建红包消息 */
     fun createRedPacketMessage(

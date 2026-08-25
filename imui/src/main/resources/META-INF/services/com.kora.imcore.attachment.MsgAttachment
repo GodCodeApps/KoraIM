@@ -3,6 +3,7 @@ com.kora.imui.attachment.TextAttachment
 com.kora.imui.attachment.UnknownAttachment
 com.kora.imui.attachment.VoiceAttachment
 com.kora.imui.attachment.VideoAttachment
+com.kora.imui.attachment.FileAttachment
 com.kora.imui.attachment.RedPacketAttachment
 com.kora.imui.attachment.TipAttachment
 com.kora.imui.attachment.CardAttachment
