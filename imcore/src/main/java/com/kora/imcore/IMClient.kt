@@ -73,6 +73,7 @@ object IMClient {
     val typingEvents: SharedFlow<String> get() = IMEventHub.typingEvents
 
     private var connectionManager: ConnectionManager? = null
+    private var databaseHelper: ImAppDatabaseHelper? = null
     private lateinit var messageRepository: MessageRepository
     private lateinit var userRepository: UserRepository
     private lateinit var conversationDao: ConversationDao
@@ -112,7 +113,8 @@ object IMClient {
         }
         release()
         val appContext = context.applicationContext
-        val database = ImAppDatabaseHelper(appContext)
+        val database = ImAppDatabaseHelper(appContext, account)
+        databaseHelper = database
         val syncCursor = SyncStateDao(database).getCursor(account)
         conversationDao = ConversationDao(database)
         messageRepository = MessageRepository(MessageDao(database, conversationDao).also {
@@ -282,6 +284,8 @@ object IMClient {
     fun release() {
         connectionManager?.disconnect()
         connectionManager = null
+        databaseHelper?.close()
+        databaseHelper = null
         if (::userRepository.isInitialized) userRepository.clear()
         IMRuntime.reset()
     }

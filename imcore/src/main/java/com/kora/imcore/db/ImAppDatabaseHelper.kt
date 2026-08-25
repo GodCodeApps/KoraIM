@@ -3,11 +3,13 @@ package com.kora.imcore.db
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import java.security.MessageDigest
 
-class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+class ImAppDatabaseHelper(context: Context, account: String) :
+    SQLiteOpenHelper(context, databaseNameFor(account), null, DATABASE_VERSION) {
 
     companion object {
-        const val DATABASE_NAME = "im_app_database.db"
+        private const val DATABASE_PREFIX = "im_app_database_"
         const val DATABASE_VERSION = 7
 
         const val TABLE_MESSAGE = "message"
@@ -34,6 +36,13 @@ class ImAppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
         const val COLUMN_USER_NICKNAME = "nickname"
         const val COLUMN_USER_AVATAR = "avatar"
         const val COLUMN_USER_UPDATE_TIME = "updateTime"
+
+        fun databaseNameFor(account: String): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+                .digest(account.toByteArray(Charsets.UTF_8))
+            val hash = digest.joinToString("") { "%02x".format(it) }
+            return "$DATABASE_PREFIX$hash.db"
+        }
     }
 
     override fun onCreate(db: SQLiteDatabase) {
