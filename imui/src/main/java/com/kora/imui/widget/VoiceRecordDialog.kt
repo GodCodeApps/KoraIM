@@ -12,6 +12,7 @@ import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.graphics.Typeface
 import com.kora.imui.R
 
 /**
@@ -67,6 +68,7 @@ class VoiceRecordDialog(context: Context) : Dialog(context) {
         ivWarning.visibility = View.GONE
         tvTip.text = "手指上滑，取消发送"
         tvTip.setBackgroundResource(0)
+        tvTip.setTypeface(null, Typeface.NORMAL)
     }
 
     /** 设置为上滑取消状态 */
@@ -77,6 +79,7 @@ class VoiceRecordDialog(context: Context) : Dialog(context) {
         ivWarning.visibility = View.GONE
         tvTip.text = "松开手指，取消发送"
         tvTip.setBackgroundResource(R.drawable.bg_voice_cancel_badge)
+        tvTip.setTypeface(null, Typeface.BOLD)
     }
 
     /** 设置为录音时间太短警告状态 */
@@ -87,6 +90,7 @@ class VoiceRecordDialog(context: Context) : Dialog(context) {
         ivWarning.visibility = View.VISIBLE
         tvTip.text = "说话时间太短"
         tvTip.setBackgroundResource(0)
+        tvTip.setTypeface(null, Typeface.NORMAL)
         tvTip.postDelayed({
             dismiss()
             onDismiss()

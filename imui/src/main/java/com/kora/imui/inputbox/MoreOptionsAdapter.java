@@ -6,6 +6,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.graphics.Color;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -43,6 +44,8 @@ public class MoreOptionsAdapter extends RecyclerView.Adapter<MoreOptionsAdapter.
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         MoreOptionItem item = options.get(position);
         holder.icon.setImageResource(item.getIconResId());
+        // Keep the compact, monochrome icon treatment used by WeChat's more panel.
+        holder.icon.setColorFilter(Color.parseColor("#576B95"));
         holder.name.setText(item.getName());
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) {
