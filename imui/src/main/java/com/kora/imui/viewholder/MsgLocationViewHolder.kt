@@ -37,18 +37,7 @@ class MsgLocationViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
             ivMap.setImageResource(R.drawable.im_bg_card)
         }
 
-        view.setOnClickListener {
-            try {
-                val clazz = Class.forName("com.xhx.circle.friends.feature.message.ui.LocationViewActivity")
-                val intent = android.content.Intent(view.context, clazz)
-                intent.putExtra("latitude", attachment.latitude)
-                intent.putExtra("longitude", attachment.longitude)
-                intent.putExtra("title", attachment.title)
-                intent.putExtra("address", attachment.address)
-                view.context.startActivity(intent)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+        // Click handling is delegated to SessionEventListener by MsgViewHolderBase.
+        // The host app decides whether this opens a map page, navigation, or another UI.
     }
 }

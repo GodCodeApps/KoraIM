@@ -279,6 +279,9 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
             }
         }
 
+        options.add("转发")
+        actions.add { ImUIKitImpl.getSessionListener()?.getForwardMessageListener()?.invoke(msg) }
+
         options.add("删除")
         actions.add {
             android.app.AlertDialog.Builder(context)

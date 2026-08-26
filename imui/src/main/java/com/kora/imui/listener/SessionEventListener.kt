@@ -13,6 +13,7 @@ open class SessionEventListener {
     private var onItemLongClickListener: ((view: android.view.View, message: IMMessage?) -> Boolean)? = null
     private var onResendClickListener: ((view: android.view.View, message: IMMessage?) -> Unit)? = null
     private var onMoreOptionClickListener: ((optionName: String) -> Unit)? = null
+    private var onForwardMessageListener: ((IMMessage) -> Unit)? = null
 
     fun onAvatarClickListener(avatarClickListener: ((view: android.view.View, account: String?) -> Unit)?) {
         this.onAvatarClickListener = avatarClickListener
@@ -37,6 +38,7 @@ open class SessionEventListener {
     fun onMoreOptionClickListener(moreOptionClickListener: ((optionName: String) -> Unit)?) {
         this.onMoreOptionClickListener = moreOptionClickListener
     }
+    fun onForwardMessageListener(listener: ((IMMessage) -> Unit)?) { onForwardMessageListener = listener }
 
     fun getAvatarClickListener(): ((view: android.view.View, account: String?) -> Unit)? = onAvatarClickListener
     fun getAvatarLongClickListener(): ((view: android.view.View, account: String?) -> Unit)? = onAvatarLongClickListener
@@ -44,6 +46,7 @@ open class SessionEventListener {
     fun getItemLongClickListener(): ((view: android.view.View, message: IMMessage?) -> Boolean)? = onItemLongClickListener
     fun getResendClickListener(): ((view: android.view.View, message: IMMessage?) -> Unit)? = onResendClickListener
     fun getMoreOptionClickListener(): ((optionName: String) -> Unit)? = onMoreOptionClickListener
+    fun getForwardMessageListener(): ((IMMessage) -> Unit)? = onForwardMessageListener
 }
 
 inline fun sessionEventListener(listener: SessionEventListener.() -> Unit): SessionEventListener {

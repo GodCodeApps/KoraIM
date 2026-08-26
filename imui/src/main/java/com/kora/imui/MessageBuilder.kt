@@ -12,11 +12,33 @@ import com.kora.imui.attachment.VideoAttachment
 import com.kora.imui.attachment.FileAttachment
 import com.kora.imui.attachment.RedPacketAttachment
 import com.kora.imcore.constant.MsgStatus
+import com.kora.imcore.attachment.MsgAttachment
 
 /**
  * 消息构建工厂，提供各类消息（文本、图片、视频、红包、提示）的便捷创建方法。
  */
 object MessageBuilder {
+
+    /**
+     * Creates a new outgoing message from an existing supported attachment.
+     * A new message ID and timestamp are always generated; the source message is never reused.
+     */
+    fun createForwardedMessage(
+        sessionId: String,
+        @SessionType sessionType: Int,
+        receiverId: String,
+        attachment: MsgAttachment
+    ): IMMessage = Message(
+        sessionId = sessionId,
+        sessionType = sessionType,
+        senderId = ImSdkImpl.getAccount() ?: "",
+        receiverId = receiverId,
+        type = attachment.getMsgType(),
+        direct = MsgDirection.OUT,
+        status = MsgStatus.SENDING,
+        time = System.currentTimeMillis(),
+        attachment = attachment.toJson(false)
+    )
 
     fun createFileMessage(sessionId: String, @SessionType sessionType: Int, receiverId: String, attachment: FileAttachment): IMMessage = Message(
         sessionId = sessionId, sessionType = sessionType,

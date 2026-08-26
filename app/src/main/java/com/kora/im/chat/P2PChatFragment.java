@@ -24,6 +24,35 @@ public class P2PChatFragment extends IMessageFragment {
     @Override
     public void onViewCreated(@NotNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        if (com.kora.imui.ImUIKitImpl.INSTANCE.getSessionListener() == null) {
+            com.kora.imui.ImUIKitImpl.INSTANCE.setSessionEventListener(new com.kora.imui.listener.SessionEventListener());
+        }
+        com.kora.imui.ImUIKitImpl.INSTANCE.getSessionListener().onForwardMessageListener(message -> { showForwardSelectorDialog(message); return kotlin.Unit.INSTANCE; });
+    }
+
+    private void showForwardSelectorDialog(IMMessage original) {
+        com.kora.imcore.attachment.MsgAttachment attachment = original.getAttachment();
+        if (!(attachment instanceof com.kora.imui.attachment.TextAttachment)
+                && !(attachment instanceof com.kora.imui.attachment.ImageAttachment)
+                && !(attachment instanceof com.kora.imui.attachment.VideoAttachment)
+                && !(attachment instanceof com.kora.imui.attachment.FileAttachment)
+                && !(attachment instanceof com.kora.imui.attachment.LocationAttachment)
+                && !(attachment instanceof com.kora.imui.attachment.CardAttachment)) {
+            android.widget.Toast.makeText(requireContext(), "当前消息暂不支持转发", android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        List<String> accounts = DemoUsers.INSTANCE.getAccounts();
+        List<String> names = new ArrayList<>();
+        for (String account : accounts) {
+            DemoUserInfo info = DemoUsers.INSTANCE.demoUser(account);
+            names.add(info != null ? info.getNickname() + " (" + account + ")" : account);
+        }
+        new AlertDialog.Builder(requireContext()).setTitle("选择转发对象")
+                .setItems(names.toArray(new String[0]), (dialog, which) -> {
+                    String target = accounts.get(which);
+                    if (target.equals(com.kora.imcore.ImSdkImpl.INSTANCE.getAccount())) return;
+                    sendMessageToOtherSession(MessageBuilder.INSTANCE.createForwardedMessage(target, getSessionType(), target, attachment));
+                }).show();
     }
 
     @Override

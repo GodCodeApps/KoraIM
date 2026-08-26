@@ -165,6 +165,11 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
         return true
     }
 
+    /** Sends a message to another session without inserting it into the currently open chat list. */
+    protected fun sendMessageToOtherSession(msg: IMMessage) {
+        viewLifecycleOwner.lifecycleScope.launch { IMClient.sendMessage(msg) }
+    }
+
     open fun onMoreOptionClick(optionName: String) {
         // Subclasses can override to handle custom more options (e.g. business card, location)
     }
