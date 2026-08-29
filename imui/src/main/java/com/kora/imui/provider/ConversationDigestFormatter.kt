@@ -35,6 +35,9 @@ object ConversationDigestFormatter : IMConversationDigestProvider {
      * 根据具体消息模型及当前用户账号格式化摘要
      */
     fun formatMessage(message: Message, currentOwnerId: String? = null): String {
+        if (message.recalled) {
+            return if (!currentOwnerId.isNullOrBlank() && message.senderId == currentOwnerId) "你撤回了一条消息" else "对方撤回了一条消息"
+        }
         val attachment = message.getAttachment()
         return when (attachment) {
             is TextAttachment -> attachment.content

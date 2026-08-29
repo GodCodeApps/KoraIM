@@ -47,6 +47,11 @@ internal class ImServiceProxy : ServiceConnection {
         service?.sendTyping(receiverId)
     }
 
+    fun recall(messageId: String, requestId: String, callback: (com.kora.imcore.netty.PendingRecallRegistry.Result) -> Unit) {
+        service?.recall(messageId, requestId, callback)
+            ?: callback(com.kora.imcore.netty.PendingRecallRegistry.Result(false, "NETWORK", "服务尚未连接"))
+    }
+
     /** 断开连接并清空状态 */
     fun disconnect() {
         service?.disconnect()

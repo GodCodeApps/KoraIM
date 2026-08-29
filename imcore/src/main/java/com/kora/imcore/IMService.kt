@@ -13,6 +13,7 @@ import com.kora.imcore.constant.MsgStatus
 import com.kora.imcore.db.Message
 import com.kora.imcore.netty.ChatClientInitializer
 import com.kora.imcore.netty.PendingAckRegistry
+import com.kora.imcore.netty.PendingRecallRegistry
 import com.kora.imcore.netty.WireEnvelope
 import com.kora.imcore.event.ConnectionState
 import com.kora.imcore.event.IMEventHub
@@ -115,6 +116,23 @@ class IMService : Service() {
         activeChannel.writeAndFlush(WireEnvelope.typing(receiverId).encode(gson))
     }
 
+    internal fun recall(messageId: String, requestId: String, callback: (PendingRecallRegistry.Result) -> Unit) {
+        val activeChannel = channel?.takeIf { it.isActive }
+        if (activeChannel == null) {
+            callback(PendingRecallRegistry.Result(false, "NETWORK", "当前网络不可用"))
+            return
+        }
+        val timeout = Runnable { PendingRecallRegistry.fail(requestId) }
+        PendingRecallRegistry.register(requestId) { result ->
+            mainHandler.removeCallbacks(timeout)
+            callback(result)
+        }
+        mainHandler.postDelayed(timeout, ACK_TIMEOUT_MS)
+        activeChannel.writeAndFlush(WireEnvelope.recall(messageId, requestId).encode(gson)).addListener { future ->
+            if (!future.isSuccess) PendingRecallRegistry.fail(requestId)
+        }
+    }
+
     /**
      * 主动断开连接并释放资源。
      * 会清空消息队列、取消所有等待中的 ACK 回调、注销网络监听。
@@ -127,6 +145,7 @@ class IMService : Service() {
         outgoingMessages.clear()
         retryCountMap.clear()
         PendingAckRegistry.failAll()
+        PendingRecallRegistry.failAll()
         networkMonitor?.unregister()
         networkMonitor = null
         IMEventHub.setConnectionState(ConnectionState.Disconnected)
@@ -204,6 +223,7 @@ class IMService : Service() {
                 IMEventHub.setConnectionState(ConnectionState.Connected(host, port))
                 // 连接成功后：1.登录认证 → 2.拉取离线消息 → 3.发送队列中的消息
                 channel?.writeAndFlush(WireEnvelope.login(account).encode(gson))
+                Log.i("KoraIM_Sync", "request account=$account cursor=${IMRuntime.syncCursor} reason=connected")
                 channel?.writeAndFlush(WireEnvelope.sync(IMRuntime.syncCursor).encode(gson))
                 drainOutgoingMessages()
             } else {
@@ -329,6 +349,7 @@ class IMService : Service() {
         cancelPendingReconnect()
         mainHandler.removeCallbacksAndMessages(null)
         PendingAckRegistry.failAll()
+        PendingRecallRegistry.failAll()
         outgoingMessages.clear()
         retryCountMap.clear()
         inFlightMessage = null

@@ -27,6 +27,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import com.kora.imcore.listener.UnreadCountListener
 import com.kora.imcore.listener.UnreadCountSubscription
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 /**
  * IM SDK 的公开门面（Facade），是上层使用 KoraIM 的唯一入口。
@@ -275,6 +277,23 @@ object IMClient {
     suspend fun getUserInfo(account: String?): UserInfo? {
         ensureInitialized()
         return userRepository.get(account)
+    }
+
+    suspend fun recallMessage(messageId: String): RecallResult {
+        ensureInitialized()
+        val message = messageRepository.getMessageById(messageId)
+            ?: return RecallResult.Failed("NOT_FOUND", "消息不存在")
+        if (message.senderId != IMRuntime.ownerId) return RecallResult.Failed("FORBIDDEN", "只能撤回自己发送的消息")
+        if (message.recalled) return RecallResult.Success
+        val requestId = java.util.UUID.randomUUID().toString()
+        return suspendCancellableCoroutine { continuation ->
+            connectionManager?.recall(messageId, requestId) { result ->
+                if (continuation.isActive) continuation.resume(
+                    if (result.success) RecallResult.Success
+                    else RecallResult.Failed(result.errorCode, result.errorMessage.ifBlank { "撤回失败" })
+                )
+            } ?: continuation.resume(RecallResult.Failed("NETWORK", "服务尚未连接"))
+        }
     }
 
     /** Update user data already fetched by the host app in memory and SQLite. */

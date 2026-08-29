@@ -55,6 +55,9 @@ class SqliteStorage extends BaseStorage {
                 status INTEGER NOT NULL DEFAULT 1,
                 send_time INTEGER NOT NULL,
                 created_at INTEGER NOT NULL
+                ,recalled INTEGER NOT NULL DEFAULT 0
+                ,recalled_at INTEGER NOT NULL DEFAULT 0
+                ,recalled_by TEXT NOT NULL DEFAULT ''
             );
 
             CREATE INDEX IF NOT EXISTS idx_messages_session_time 
@@ -81,6 +84,10 @@ class SqliteStorage extends BaseStorage {
                 updated_at INTEGER NOT NULL
             );
         `);
+        const messageColumns = new Set(this.db.prepare('PRAGMA table_info(messages)').all().map(c => c.name));
+        if (!messageColumns.has('recalled')) this.db.exec(`ALTER TABLE messages ADD COLUMN recalled INTEGER NOT NULL DEFAULT 0`);
+        if (!messageColumns.has('recalled_at')) this.db.exec(`ALTER TABLE messages ADD COLUMN recalled_at INTEGER NOT NULL DEFAULT 0`);
+        if (!messageColumns.has('recalled_by')) this.db.exec(`ALTER TABLE messages ADD COLUMN recalled_by TEXT NOT NULL DEFAULT ''`);
     }
 
     _prepareStatements() {
@@ -129,6 +136,10 @@ class SqliteStorage extends BaseStorage {
             `INSERT INTO user_cursors (user_id, max_cursor, last_acked_cursor, updated_at) 
              VALUES (?, ?, ?, ?) 
              ON CONFLICT(user_id) DO UPDATE SET last_acked_cursor = MAX(last_acked_cursor, ?), updated_at = ?`
+        );
+        this.stmtGetMessage = this.db.prepare(`SELECT * FROM messages WHERE message_id = ?`);
+        this.stmtRecallMessage = this.db.prepare(
+            `UPDATE messages SET recalled = 1, recalled_at = ?, recalled_by = ? WHERE message_id = ?`
         );
     }
 
@@ -251,6 +262,10 @@ class SqliteStorage extends BaseStorage {
     async getSyncEvents(userId, cursor, limit) {
         const pageSize = Math.max(1, limit || this.config.syncPageSize || 100);
         const startCursor = Math.max(0, Number(cursor || 0));
+        const cursorState = this.db.prepare(
+            `SELECT max_cursor AS maxCursor, last_acked_cursor AS lastAckedCursor FROM user_cursors WHERE user_id = ?`
+        ).get(userId);
+        console.log(`[Sync][SQLite] query user=${userId} requested=${startCursor} max=${cursorState?.maxCursor ?? 0} lastAck=${cursorState?.lastAckedCursor ?? 0}`);
 
         const rows = this.stmtGetSyncEvents.all(userId, startCursor, pageSize);
         const events = rows.map(r => ({
@@ -268,6 +283,38 @@ class SqliteStorage extends BaseStorage {
             nextCursor,
             hasMore
         };
+    }
+
+    async recallMessage(userId, messageId, recallWindowMs) {
+        const row = this.stmtGetMessage.get(messageId);
+        if (!row) return { success: false, errorCode: 'NOT_FOUND', errorMessage: '消息不存在' };
+        if (row.sender_id !== userId) return { success: false, errorCode: 'FORBIDDEN', errorMessage: '只能撤回自己发送的消息' };
+        if (row.recalled) return { success: true, message: this._recalledPayload(row) };
+        const now = Date.now();
+        if (now - Number(row.send_time) > recallWindowMs) {
+            return { success: false, errorCode: 'EXPIRED', errorMessage: '发送时间超过2分钟，不能撤回' };
+        }
+        const tx = this.db.transaction(() => {
+            this.stmtRecallMessage.run(now, userId, messageId);
+            const payload = this._recalledPayload({ ...row, recalled: 1, recalled_at: now, recalled_by: userId });
+            for (const target of [row.sender_id, row.receiver_id]) {
+                const cursor = this._nextUserCursor(target, now);
+                this.stmtInsertSyncEvent.run(target, cursor, 'recall', messageId, JSON.stringify(payload), now);
+            }
+            if (this.db.prepare(`SELECT last_message_id FROM sessions WHERE session_id = ?`).get(row.session_id)?.last_message_id === messageId) {
+                this.stmtUpdateSessionLastMsg.run(messageId, '撤回了一条消息', Number(row.send_time), now, row.session_id);
+            }
+            return payload;
+        });
+        return { success: true, message: tx() };
+    }
+
+    _recalledPayload(row) {
+        return { id: 0, messageId: row.message_id, sessionType: Number(row.session_type),
+            sessionId: row.session_id, senderId: row.sender_id, receiverId: row.receiver_id,
+            type: Number(row.msg_type), direct: 1, status: 1, time: Number(row.send_time),
+            attachment: row.attachment, extra: row.extra, recalled: true,
+            recalledAt: Number(row.recalled_at || 0), recalledBy: row.recalled_by || row.sender_id };
     }
 
     async updateUserSyncAck(userId, cursor) {

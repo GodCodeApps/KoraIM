@@ -158,6 +158,11 @@ class InputPanel(
         imm.showSoftInput(editor, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
     }
 
+    fun reedit(text: String) {
+        clearQuote()
+        chatInputView.setInputText(text)
+    }
+
     private fun clearQuote() {
         pendingQuote = null
         quotePreview.visibility = View.GONE

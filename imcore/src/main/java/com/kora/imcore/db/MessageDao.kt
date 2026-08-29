@@ -69,6 +69,9 @@ class MessageDao(
             val idxExtra = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_EXTRA)
             val idxSenderId = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_SENDER_ID)
             val idxReceiverId = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_RECEIVER_ID)
+            val idxRecalled = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_RECALLED)
+            val idxRecalledAt = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_RECALLED_AT)
+            val idxRecalledBy = cursor.getColumnIndexOrThrow(ImAppDatabaseHelper.COLUMN_RECALLED_BY)
 
             do {
                 val msg = Message()
@@ -84,6 +87,9 @@ class MessageDao(
                 msg.extra = cursor.getString(idxExtra)
                 msg.senderId = cursor.getString(idxSenderId)
                 msg.receiverId = cursor.getString(idxReceiverId)
+                msg.recalled = cursor.getInt(idxRecalled) != 0
+                msg.recalledAt = cursor.getLong(idxRecalledAt)
+                msg.recalledBy = cursor.getString(idxRecalledBy)
                 list.add(msg)
             } while (cursor.moveToNext())
         }
@@ -107,6 +113,9 @@ class MessageDao(
         cv.put(ImAppDatabaseHelper.COLUMN_EXTRA, msg.extra)
         cv.put(ImAppDatabaseHelper.COLUMN_SENDER_ID, msg.senderId)
         cv.put(ImAppDatabaseHelper.COLUMN_RECEIVER_ID, msg.receiverId)
+        cv.put(ImAppDatabaseHelper.COLUMN_RECALLED, if (msg.recalled) 1 else 0)
+        cv.put(ImAppDatabaseHelper.COLUMN_RECALLED_AT, msg.recalledAt)
+        cv.put(ImAppDatabaseHelper.COLUMN_RECALLED_BY, msg.recalledBy)
         return cv
     }
 
@@ -164,6 +173,21 @@ class MessageDao(
         try {
             events.forEach { event ->
                 val message = event.payload ?: return@forEach
+                if (event.eventType == "recall") {
+                    val values = ContentValues().apply {
+                        put(ImAppDatabaseHelper.COLUMN_RECALLED, 1)
+                        put(ImAppDatabaseHelper.COLUMN_RECALLED_AT, message.recalledAt)
+                        put(ImAppDatabaseHelper.COLUMN_RECALLED_BY, message.recalledBy)
+                    }
+                    db.update(ImAppDatabaseHelper.TABLE_MESSAGE, values,
+                        "${ImAppDatabaseHelper.COLUMN_MESSAGE_ID} = ?", arrayOf(message.messageId))
+                    val isLatest = db.rawQuery(
+                        "SELECT 1 FROM ${ImAppDatabaseHelper.TABLE_CONVERSATION} WHERE ownerId = ? AND sessionId = ? AND lastMessageId = ?",
+                        arrayOf(ownerId, message.sessionId, message.messageId)
+                    ).use { it.moveToFirst() }
+                    if (isLatest) conversationDao.upsertInTransaction(db, message.toConversation(ownerId), false, forceUpdate = true)
+                    return@forEach
+                }
                 message.id = 0
                 message.status = MsgStatus.SUCCESS
                 message.direct = if (message.senderId == ownerId) {
@@ -251,6 +275,26 @@ class MessageDao(
             "messageId = ?",
             arrayOf(messageId)
         )
+        notifyChange()
+    }
+
+    suspend fun markRecalled(message: Message, ownerId: String) = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            db.update(ImAppDatabaseHelper.TABLE_MESSAGE, ContentValues().apply {
+                put(ImAppDatabaseHelper.COLUMN_RECALLED, 1)
+                put(ImAppDatabaseHelper.COLUMN_RECALLED_AT, message.recalledAt)
+                put(ImAppDatabaseHelper.COLUMN_RECALLED_BY, message.recalledBy)
+            }, "${ImAppDatabaseHelper.COLUMN_MESSAGE_ID} = ?", arrayOf(message.messageId))
+            val isLatest = db.rawQuery(
+                "SELECT 1 FROM ${ImAppDatabaseHelper.TABLE_CONVERSATION} WHERE ownerId = ? AND sessionId = ? AND lastMessageId = ?",
+                arrayOf(ownerId, message.sessionId, message.messageId)
+            ).use { it.moveToFirst() }
+            if (isLatest) conversationDao.upsertInTransaction(db, message.toConversation(ownerId), false, forceUpdate = true)
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+        conversationDao.notifyChanged()
         notifyChange()
     }
 

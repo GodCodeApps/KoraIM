@@ -69,6 +69,10 @@ class MysqlStorage extends BaseStorage {
                 \`status\` INT NOT NULL DEFAULT 1,
                 \`send_time\` BIGINT NOT NULL,
                 \`created_at\` BIGINT NOT NULL,
+                \`updated_at\` BIGINT NOT NULL DEFAULT 0,
+                \`recalled\` TINYINT NOT NULL DEFAULT 0,
+                \`recalled_at\` BIGINT NOT NULL DEFAULT 0,
+                \`recalled_by\` VARCHAR(64) NOT NULL DEFAULT '',
                 PRIMARY KEY (\`message_id\`),
                 KEY \`idx_session_time\` (\`session_id\`, \`send_time\` DESC)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -103,6 +107,10 @@ class MysqlStorage extends BaseStorage {
         await this.pool.query(createMessagesTable);
         await this.pool.query(createSyncEventsTable);
         await this.pool.query(createUserCursorsTable);
+        await this.pool.query("ALTER TABLE `messages` ADD COLUMN IF NOT EXISTS `updated_at` BIGINT NOT NULL DEFAULT 0");
+        await this.pool.query("ALTER TABLE `messages` ADD COLUMN IF NOT EXISTS `recalled` TINYINT NOT NULL DEFAULT 0");
+        await this.pool.query("ALTER TABLE `messages` ADD COLUMN IF NOT EXISTS `recalled_at` BIGINT NOT NULL DEFAULT 0");
+        await this.pool.query("ALTER TABLE `messages` ADD COLUMN IF NOT EXISTS `recalled_by` VARCHAR(64) NOT NULL DEFAULT ''");
     }
 
     async findOrCreateSession(first, second) {
@@ -241,9 +249,43 @@ class MysqlStorage extends BaseStorage {
         }
     }
 
+    async recallMessage(userId, messageId, recallWindowMs) {
+        const conn = await this.pool.getConnection();
+        try {
+            await conn.beginTransaction();
+            const [rows] = await conn.query('SELECT * FROM `messages` WHERE `message_id` = ? FOR UPDATE', [messageId]);
+            if (!rows.length) { await conn.rollback(); return { success: false, errorCode: 'NOT_FOUND', errorMessage: '消息不存在' }; }
+            const row = rows[0];
+            if (row.sender_id !== userId) { await conn.rollback(); return { success: false, errorCode: 'FORBIDDEN', errorMessage: '只能撤回自己发送的消息' }; }
+            const now = Date.now();
+            if (!row.recalled && now - Number(row.send_time) > recallWindowMs) {
+                await conn.rollback(); return { success: false, errorCode: 'EXPIRED', errorMessage: '发送时间超过2分钟，不能撤回' };
+            }
+            if (!row.recalled) await conn.query('UPDATE `messages` SET `recalled`=1, `recalled_at`=?, `recalled_by`=? WHERE `message_id`=?', [now, userId, messageId]);
+            const payload = { id: 0, messageId: row.message_id, sessionType: Number(row.session_type), sessionId: row.session_id,
+                senderId: row.sender_id, receiverId: row.receiver_id, type: Number(row.msg_type), direct: 1,
+                status: 1, time: Number(row.send_time), attachment: row.attachment, extra: row.extra,
+                recalled: true, recalledAt: Number(row.recalled_at || now), recalledBy: row.recalled_by || userId };
+            if (!row.recalled) {
+                for (const target of [row.sender_id, row.receiver_id]) {
+                    const cursor = await this._nextUserCursorInTx(conn, target, now);
+                    await conn.query("INSERT INTO `sync_events` (`user_id`,`cursor`,`event_type`,`message_id`,`payload_json`,`created_at`) VALUES (?, ?, 'recall', ?, ?, ?)", [target, cursor, messageId, JSON.stringify(payload), now]);
+                }
+                await conn.query("UPDATE `sessions` SET `last_msg_preview`='撤回了一条消息', `updated_at`=? WHERE `session_id`=? AND `last_message_id`=?", [now, row.session_id, messageId]);
+            }
+            await conn.commit();
+            return { success: true, message: payload };
+        } catch (err) { await conn.rollback(); throw err; } finally { conn.release(); }
+    }
+
     async getSyncEvents(userId, cursor, limit) {
         const pageSize = Math.max(1, limit || this.config.syncPageSize || 100);
         const startCursor = Math.max(0, Number(cursor || 0));
+        const [cursorRows] = await this.pool.query(
+            'SELECT `max_cursor` AS `maxCursor`, `last_acked_cursor` AS `lastAckedCursor` FROM `user_cursors` WHERE `user_id` = ?',
+            [userId]
+        );
+        console.log(`[Sync][MySQL] query user=${userId} requested=${startCursor} max=${cursorRows[0]?.maxCursor ?? 0} lastAck=${cursorRows[0]?.lastAckedCursor ?? 0}`);
 
         const [rows] = await this.pool.query(
             `SELECT \`cursor\`, \`event_type\` AS \`eventType\`, \`payload_json\` 

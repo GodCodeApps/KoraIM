@@ -58,7 +58,7 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                 orientation = LinearLayout.VERTICAL
                 addView(childView)
                 addView(TextView(itemView.context).apply {
-                    text = quote.displayText()
+                    text = if (IMClient.getMessage(quote.messageId)?.recalled == true) "引用的消息已撤回" else quote.displayText()
                     textSize = 12f
                     setTextColor(android.graphics.Color.parseColor("#777777"))
                     maxLines = 2
@@ -310,6 +310,24 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
         options.add("引用")
         actions.add {
             QuoteActionDispatcher.onQuote?.invoke(msg)
+        }
+
+        val canRecall = msg.getMsgDirection() == MsgDirection.OUT &&
+            msg.getMsgStatus() == MsgStatus.SUCCESS &&
+            !msg.getMessage().recalled &&
+            System.currentTimeMillis() - msg.getMsgTime() <= 2 * 60 * 1000L
+        if (canRecall) {
+            options.add("撤回")
+            actions.add {
+                launchWhenAttached(itemView) {
+                    when (val result = IMClient.recallMessage(msg.getMsgId())) {
+                        is com.kora.imcore.RecallResult.Success -> Unit
+                        is com.kora.imcore.RecallResult.Failed -> android.widget.Toast.makeText(
+                            context, result.message, android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
         }
 
         options.add("删除")

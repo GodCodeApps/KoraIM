@@ -47,6 +47,7 @@ object IMNotificationManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var isInitialized = false
     private var observeJob: Job? = null
+    private var recallObserveJob: Job? = null
     private var appContext: Context? = null
     private var targetChatActivityClass: Class<out Activity>? = null
 
@@ -194,6 +195,7 @@ object IMNotificationManager {
 
     private fun startObservingIncomingMessages() {
         observeJob?.cancel()
+        recallObserveJob?.cancel()
         observeJob = scope.launch(Dispatchers.IO) {
             IMClient.incomingMessages.collect { message ->
                 handleIncomingMessage(message)
@@ -245,6 +247,11 @@ object IMNotificationManager {
                 runCatching { Glide.with(context).asBitmap().load(it).submit(128, 128).get() }.getOrNull()
             }
             remote ?: BitmapFactory.decodeResource(context.resources, R.drawable.ic_launcher_foreground)
+        }
+        recallObserveJob = scope.launch(Dispatchers.IO) {
+            IMClient.messageUpdates.collect { message ->
+                if (message.recalled) cancelNotification(message.sessionId)
+            }
         }
 
         // 构造点击跳转 Intent

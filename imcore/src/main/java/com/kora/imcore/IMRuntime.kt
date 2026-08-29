@@ -9,6 +9,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import com.kora.imcore.netty.SyncEvent
+import android.util.Log
 
 /**
  * IM 运行时单例，作为 Netty 网络层和本地数据层之间的桥梁。
@@ -69,6 +70,13 @@ internal object IMRuntime {
         }
     }
 
+    fun recalled(message: Message) {
+        scope.launch {
+            messages.markRecalled(message, ownerId)
+            IMEventHub.emitUpdate(message)
+        }
+    }
+
     /**
      * 处理增量同步响应。
      * 1. 将同步事件批量写入数据库
@@ -78,10 +86,25 @@ internal object IMRuntime {
      */
     fun synced(events: List<SyncEvent>, cursor: Long, onCommitted: () -> Unit) {
         scope.launch {
-            messages.applySync(ownerId, events, cursor)
-            syncCursor = cursor
-            events.mapNotNull { it.payload }.forEach(IMEventHub::emitIncoming)
-            onCommitted()
+            Log.i("KoraIM_Sync", "applyStart owner=$ownerId cursor=$cursor events=${events.size}")
+            try {
+                messages.applySync(ownerId, events, cursor)
+                syncCursor = cursor
+                events.forEach { event ->
+                    event.payload?.let {
+                        if (event.eventType == "recall") IMEventHub.emitUpdate(it) else IMEventHub.emitIncoming(it)
+                    }
+                }
+                Log.i("KoraIM_Sync", "applySuccess owner=$ownerId cursor=$cursor events=${events.size}")
+                onCommitted()
+            } catch (error: Throwable) {
+                Log.e(
+                    "KoraIM_Sync",
+                    "applyFailed owner=$ownerId cursor=$cursor events=${events.size} " +
+                        "items=${events.joinToString(limit = 20) { "${it.eventType}:${it.payload?.messageId.orEmpty()}@${it.cursor}" }}",
+                    error
+                )
+            }
         }
     }
 

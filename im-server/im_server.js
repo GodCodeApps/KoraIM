@@ -63,6 +63,7 @@ async function handleFrame(socket, line) {
         // 4. 同步 ACK（客户端确认消费到的最新游标）
         if (envelope.type === 'sync_ack') {
             if (socket.account && envelope.cursor !== undefined) {
+                console.log(`[Sync] ack account=${socket.account} cursor=${Number(envelope.cursor)}`);
                 await storage.updateUserSyncAck(socket.account, envelope.cursor);
             }
             return;
@@ -72,10 +73,16 @@ async function handleFrame(socket, line) {
         if (envelope.type === 'sync') {
             if (!socket.account) throw new Error('Login required');
             const cursor = Math.max(0, Number(envelope.cursor || 0));
+            console.log(`[Sync] request account=${socket.account} cursor=${cursor}`);
             const { events, nextCursor, hasMore } = await storage.getSyncEvents(
                 socket.account,
                 cursor,
                 config.syncPageSize
+            );
+            console.log(
+                `[Sync] result account=${socket.account} requested=${cursor} events=${events.length} ` +
+                `nextCursor=${nextCursor} hasMore=${hasMore} items=` +
+                events.slice(0, 20).map(event => `${event.eventType}:${event.payload?.messageId || ''}@${event.cursor}`).join(',')
             );
             writeFrame(socket, {
                 type: 'sync_result',
@@ -83,6 +90,23 @@ async function handleFrame(socket, line) {
                 nextCursor,
                 hasMore
             });
+            return;
+        }
+
+        if (envelope.type === 'recall') {
+            if (!socket.account) throw new Error('Login required');
+            const requestId = String(envelope.requestId || '');
+            const messageId = String(envelope.messageId || '');
+            const result = await storage.recallMessage(socket.account, messageId, 2 * 60 * 1000);
+            writeFrame(socket, { type: 'recall_ack', requestId, messageId, success: result.success,
+                errorCode: result.errorCode || '', errorMessage: result.errorMessage || '' });
+            if (result.success && result.message) {
+                for (const target of new Set([result.message.senderId, result.message.receiverId])) {
+                    clients.get(target)?.forEach(client => writeFrame(client, {
+                        type: 'recall', messageId, payload: result.message
+                    }));
+                }
+            }
             return;
         }
 

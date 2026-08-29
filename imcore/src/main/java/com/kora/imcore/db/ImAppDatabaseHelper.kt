@@ -10,7 +10,7 @@ class ImAppDatabaseHelper(context: Context, account: String) :
 
     companion object {
         private const val DATABASE_PREFIX = "im_app_database_"
-        const val DATABASE_VERSION = 7
+        const val DATABASE_VERSION = 8
 
         const val TABLE_MESSAGE = "message"
         const val TABLE_USER_INFO = "user_info"
@@ -30,6 +30,9 @@ class ImAppDatabaseHelper(context: Context, account: String) :
         const val COLUMN_EXTRA = "extra"
         const val COLUMN_SENDER_ID = "senderId"
         const val COLUMN_RECEIVER_ID = "receiverId"
+        const val COLUMN_RECALLED = "recalled"
+        const val COLUMN_RECALLED_AT = "recalledAt"
+        const val COLUMN_RECALLED_BY = "recalledBy"
         
         // User_info columns (some overlap like account, nickname, avatar)
         const val COLUMN_USER_ACCOUNT = "account"
@@ -59,7 +62,10 @@ class ImAppDatabaseHelper(context: Context, account: String) :
                 $COLUMN_ATTACHMENT TEXT NOT NULL,
                 $COLUMN_EXTRA TEXT NOT NULL,
                 $COLUMN_SENDER_ID TEXT NOT NULL,
-                $COLUMN_RECEIVER_ID TEXT NOT NULL
+                $COLUMN_RECEIVER_ID TEXT NOT NULL,
+                $COLUMN_RECALLED INTEGER NOT NULL DEFAULT 0,
+                $COLUMN_RECALLED_AT INTEGER NOT NULL DEFAULT 0,
+                $COLUMN_RECALLED_BY TEXT NOT NULL DEFAULT ''
             )
         """.trimIndent()
         

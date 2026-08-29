@@ -63,4 +63,6 @@ internal class MessageRepository(private val dao: MessageDao) {
 
     /** 删除单条消息并更新会话预览 */
     suspend fun delete(messageId: String, ownerId: String) = dao.deleteMessage(messageId, ownerId)
+
+    suspend fun markRecalled(message: Message, ownerId: String) = dao.markRecalled(message, ownerId)
 }

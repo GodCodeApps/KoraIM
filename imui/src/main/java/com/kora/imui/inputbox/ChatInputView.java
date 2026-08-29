@@ -402,6 +402,13 @@ public class ChatInputView extends LinearLayout {
         EmojiDisplayUtils.display(getContext(), etMessage, etMessage.getText());
     }
 
+    public void setInputText(String text) {
+        etMessage.setText(text == null ? "" : text);
+        etMessage.setSelection(etMessage.length());
+        switchMode(InputMode.TEXT);
+        showKeyboard();
+    }
+
     public void hideAllPanels() {
         panelMore.setVisibility(GONE);
         panelEmoji.setVisibility(GONE);

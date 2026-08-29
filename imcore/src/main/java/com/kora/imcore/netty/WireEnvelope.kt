@@ -44,7 +44,10 @@ internal data class WireEnvelope(
     /** 接收方账号（用于 typing 等点对点控制信令） */
     val receiverId: String? = null,
     /** 发送方账号（用于 typing 等点对点控制信令） */
-    val senderId: String? = null
+    val senderId: String? = null,
+    val requestId: String? = null,
+    val errorCode: String? = null,
+    val errorMessage: String? = null
 ) {
     /** 序列化为 JSON 并追加换行符（NDJSON 格式） */
     fun encode(gson: Gson): String = gson.toJson(this) + "\n"
@@ -59,6 +62,8 @@ internal data class WireEnvelope(
         const val TYPE_PING = "ping"
         const val TYPE_PONG = "pong"
         const val TYPE_TYPING = "typing"
+        const val TYPE_RECALL = "recall"
+        const val TYPE_RECALL_ACK = "recall_ack"
 
         /** 构建消息帧 */
         fun message(message: Message) = WireEnvelope(TYPE_MESSAGE, message.messageId, message)
@@ -68,6 +73,9 @@ internal data class WireEnvelope(
 
         /** 构建“正在输入”控制帧 */
         fun typing(receiverId: String) = WireEnvelope(type = TYPE_TYPING, receiverId = receiverId)
+        fun recall(messageId: String, requestId: String) = WireEnvelope(
+            type = TYPE_RECALL, messageId = messageId, requestId = requestId
+        )
 
         /** 构建同步请求帧 */
         fun sync(cursor: Long) = WireEnvelope(type = TYPE_SYNC, cursor = cursor)

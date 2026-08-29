@@ -50,15 +50,31 @@ internal class ChatClientHandler(
                     ctx.writeAndFlush(gson.toJson(WireEnvelope(WireEnvelope.TYPE_ACK, envelope.messageId)) + "\n")
                     deliverMessage(message)
                 }
+                WireEnvelope.TYPE_RECALL -> envelope.payload?.let(IMRuntime::recalled)
+                WireEnvelope.TYPE_RECALL_ACK -> PendingRecallRegistry.complete(
+                    envelope.requestId.orEmpty(),
+                    PendingRecallRegistry.Result(
+                        envelope.success == true,
+                        envelope.errorCode.orEmpty(),
+                        envelope.errorMessage.orEmpty()
+                    )
+                )
                 WireEnvelope.TYPE_SYNC_RESULT -> {
                     // 增量同步响应：批量处理离线消息，更新同步游标
                     val events = envelope.events.orEmpty()
                     val nextCursor = envelope.nextCursor ?: 0L
+                    Log.i(
+                        "KoraIM_Sync",
+                        "result events=${events.size} nextCursor=$nextCursor hasMore=${envelope.hasMore} " +
+                            "items=${events.joinToString(limit = 20) { "${it.eventType}:${it.payload?.messageId.orEmpty()}@${it.cursor}" }}"
+                    )
                     IMRuntime.synced(events, nextCursor) {
                         // 同步数据已落库，回复 sync_ack 告知服务端可以清理
+                        Log.i("KoraIM_Sync", "ack cursor=$nextCursor afterCommit=true")
                         ctx.writeAndFlush(WireEnvelope.syncAck(nextCursor).encode(gson))
                         // 如果还有更多数据，继续拉取下一批
                         if (envelope.hasMore == true) {
+                            Log.i("KoraIM_Sync", "request cursor=$nextCursor reason=hasMore")
                             ctx.writeAndFlush(WireEnvelope.sync(nextCursor).encode(gson))
                         }
                     }

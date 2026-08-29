@@ -36,6 +36,7 @@ object MsgViewHolderFactory {
     }
 
     fun getViewHolderByType(message: IMMessage): Class<out MsgViewHolderBase?>? {
+        if (message.getMessage().recalled) return MsgRecallViewHolder::class.java
         var clazz: Class<out MsgAttachment?>? =
             getAttachmentByType(message)
         var viewHolder = viewHolders[clazz]
@@ -65,7 +66,7 @@ object MsgViewHolderFactory {
     }
 
     fun getAllViewHolders(): List<Class<out MsgViewHolderBase>> {
-        return viewHolders.values.toList()
+        return (viewHolders.values + MsgRecallViewHolder::class.java).distinct()
     }
 
     fun getAllAttachments(): List<Class<out MsgAttachment>> {

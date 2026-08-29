@@ -95,6 +95,7 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
         com.kora.imui.quote.QuoteActionDispatcher.onLocate = { messageId ->
             messageListPanelEx?.scrollToMessage(messageId) == true
         }
+        com.kora.imui.quote.QuoteActionDispatcher.onReedit = { text -> inputPanel?.reedit(text) }
 
         // Clear existing unread messages no matter whether this page was opened from
         // the conversation list, a notification, or a user profile.
@@ -201,6 +202,7 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
     override fun onDestroyView() {
         com.kora.imui.quote.QuoteActionDispatcher.onQuote = null
         com.kora.imui.quote.QuoteActionDispatcher.onLocate = null
+        com.kora.imui.quote.QuoteActionDispatcher.onReedit = null
         super.onDestroyView()
         // 视图销毁时释放音频资源
         com.kora.imui.utils.AudioPlayHelper.stopAudio()

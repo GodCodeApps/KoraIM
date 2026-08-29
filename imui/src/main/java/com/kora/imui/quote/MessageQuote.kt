@@ -57,4 +57,5 @@ data class MessageQuote(
 internal object QuoteActionDispatcher {
     var onQuote: ((IMMessage) -> Unit)? = null
     var onLocate: ((String) -> Boolean)? = null
+    var onReedit: ((String) -> Unit)? = null
 }

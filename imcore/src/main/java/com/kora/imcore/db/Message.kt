@@ -28,6 +28,9 @@ class Message : IMMessage {
     var time: Long = 0
     var attachment: String = ""
     var extra: String = ""
+    var recalled: Boolean = false
+    var recalledAt: Long = 0
+    var recalledBy: String = ""
     override var senderId: String = ""
     override var receiverId: String = ""
 

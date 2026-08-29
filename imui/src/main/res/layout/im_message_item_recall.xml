@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:gravity="center" android:orientation="horizontal"
+    android:paddingTop="8dp" android:paddingBottom="8dp">
+    <TextView android:id="@+id/tv_recall_content" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:textColor="#888888" android:textSize="12sp" />
+    <TextView android:id="@+id/tv_reedit" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:layout_marginStart="5dp"
+        android:text="重新编辑" android:textColor="#576B95" android:textSize="12sp"
+        android:visibility="gone" />
+</LinearLayout>

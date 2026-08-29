@@ -46,6 +46,10 @@ internal class ConnectionManager(private val context: Context) {
         }
     }
 
+    fun recall(messageId: String, requestId: String, callback: (com.kora.imcore.netty.PendingRecallRegistry.Result) -> Unit) {
+        proxy.recall(messageId, requestId, callback)
+    }
+
     /** 断开连接并解绑 Service */
     fun disconnect() {
         proxy.disconnect()

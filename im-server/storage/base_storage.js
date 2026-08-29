@@ -32,6 +32,10 @@ class BaseStorage {
         throw new Error('getSyncEvents() not implemented');
     }
 
+    async recallMessage(userId, messageId, recallWindowMs) {
+        throw new Error('recallMessage() not implemented');
+    }
+
     async updateUserSyncAck(userId, cursor) {
         throw new Error('updateUserSyncAck() not implemented');
     }
