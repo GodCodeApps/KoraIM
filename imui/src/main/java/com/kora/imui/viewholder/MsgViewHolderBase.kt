@@ -26,6 +26,10 @@ import com.kora.imui.R
 import com.kora.imui.utils.TimeFormatUtils
 import com.kora.imcore.constant.MsgStatus
 import kotlinx.coroutines.launch
+import android.widget.LinearLayout
+import android.widget.TextView
+import com.kora.imui.quote.MessageQuote
+import com.kora.imui.quote.QuoteActionDispatcher
 
 /**
  * 消息气泡基类 ViewHolder：
@@ -46,7 +50,28 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
         val childView =
             LayoutInflater.from(itemView.context).inflate(getLayout(), parentContainer, false)
         bindViewHolder(childView, message)
-        parentContainer.addView(childView)
+        val quote = MessageQuote.read(message.getMsgExtra())
+        if (quote == null || isMiddleItem()) {
+            parentContainer.addView(childView)
+        } else {
+            parentContainer.addView(LinearLayout(itemView.context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(childView)
+                addView(TextView(itemView.context).apply {
+                    text = quote.displayText()
+                    textSize = 12f
+                    setTextColor(android.graphics.Color.parseColor("#777777"))
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setPadding(0, dp(6), 0, 0)
+                    setOnClickListener {
+                        if (QuoteActionDispatcher.onLocate?.invoke(quote.messageId) != true) {
+                            android.widget.Toast.makeText(itemView.context, "未找到引用的消息", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                })
+            })
+        }
     }
 
     private fun bindParentView(prevMessage: IMMessage?) {
@@ -282,6 +307,11 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
         options.add("转发")
         actions.add { ImUIKitImpl.getSessionListener()?.getForwardMessageListener()?.invoke(msg) }
 
+        options.add("引用")
+        actions.add {
+            QuoteActionDispatcher.onQuote?.invoke(msg)
+        }
+
         options.add("删除")
         actions.add {
             android.app.AlertDialog.Builder(context)
@@ -319,4 +349,6 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
             })
         }
     }
+
+    private fun dp(value: Int): Int = (value * itemView.resources.displayMetrics.density).toInt()
 }

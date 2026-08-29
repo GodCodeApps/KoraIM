@@ -126,6 +126,19 @@ class MessageListPanelEx(
         scrollToBottom()
     }
 
+    fun scrollToMessage(messageId: String): Boolean {
+        val position = mMessageAdapter?.indexOfMessage(messageId) ?: -1
+        if (position < 0) return false
+        mLinearLayoutManager?.scrollToPositionWithOffset(position, recyclerVew.height / 3)
+        recyclerVew.post {
+            recyclerVew.findViewHolderForAdapterPosition(position)?.itemView?.apply {
+                alpha = 0.45f
+                animate().alpha(1f).setDuration(450L).start()
+            }
+        }
+        return true
+    }
+
     private fun isNearBottom(): Boolean {
         val firstVisible = mLinearLayoutManager?.findFirstVisibleItemPosition() ?: return true
         return firstVisible <= 1

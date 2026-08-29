@@ -34,6 +34,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.kora.imui.IMMediaMessageSender
 import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.TextView
+import android.widget.LinearLayout
+import com.kora.imcore.impl.IMMessage
+import com.kora.imui.quote.MessageQuote
+import com.kora.imcore.IMClient
 
 
 /**
@@ -59,6 +64,9 @@ class InputPanel(
         sessionId = value
     }
     private val chatInputView = rootView.findViewById<ChatInputView>(R.id.chat_input_view)
+    private val quotePreview = rootView.findViewById<LinearLayout>(R.id.layout_quote_preview)
+    private val quotePreviewText = rootView.findViewById<TextView>(R.id.tv_quote_preview)
+    private var pendingQuote: MessageQuote? = null
     private val filePicker = fragment.registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@registerForActivityResult
         val resolver = fragment.requireContext().contentResolver
@@ -138,9 +146,27 @@ class InputPanel(
         initListener()
     }
 
+    fun quoteMessage(message: IMMessage) {
+        val info = IMClient.userInfoProvider?.getUserInfo(message.senderId)
+        val name = info?.nickname?.takeIf { it.isNotBlank() } ?: message.senderId
+        pendingQuote = MessageQuote.fromMessage(message, name)
+        quotePreviewText.text = pendingQuote?.displayText()
+        quotePreview.visibility = View.VISIBLE
+        val editor = rootView.findViewById<android.widget.EditText>(R.id.et_message)
+        editor.requestFocus()
+        val imm = fragment.requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.showSoftInput(editor, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    private fun clearQuote() {
+        pendingQuote = null
+        quotePreview.visibility = View.GONE
+        quotePreviewText.text = ""
+    }
+
 
     private fun initViews() {
-
+        rootView.findViewById<View>(R.id.btn_cancel_quote).setOnClickListener { clearQuote() }
     }
 
     private fun initViewPager() {
@@ -168,9 +194,14 @@ class InputPanel(
                     receiverId = peerId.ifBlank { sessionId },
                     msg = message
                 )
+                pendingQuote?.let { quote ->
+                    val raw = createTextMessage.getMessage()
+                    raw.extra = MessageQuote.write(raw.extra, quote)
+                }
                 // 添加到适配器并滚动到底部
 //                messageListPanelEx.addItemMsg(createTextMessage)
                 proxy?.sendMessage(createTextMessage)
+                clearQuote()
             }
 
             private var lastTypingTime = 0L
