@@ -277,6 +277,18 @@ object IMClient {
         return userRepository.get(account)
     }
 
+    /** Update user data already fetched by the host app in memory and SQLite. */
+    fun updateUserInfo(info: UserInfo) {
+        ensureInitialized()
+        userRepository.update(info)
+    }
+
+    /** Batch update user data already fetched by the host app. */
+    fun updateUserInfos(infos: List<UserInfo>) {
+        ensureInitialized()
+        userRepository.updateAll(infos)
+    }
+
     /**
      * 释放 SDK 资源：断开连接、清除缓存、取消后台协程。
      * 切换账号前必须调用此方法。

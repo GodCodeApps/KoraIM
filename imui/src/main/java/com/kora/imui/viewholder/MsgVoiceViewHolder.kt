@@ -5,6 +5,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.kora.imcore.impl.IMMessage
+import com.kora.imui.ImUIKitImpl
 import com.kora.imui.R
 import com.kora.imui.attachment.VoiceAttachment
 import java.io.File
@@ -65,6 +66,24 @@ class MsgVoiceViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
                 animationDrawable.stop()
                 ivVoiceWave.setImageResource(R.drawable.ic_chat_voice_3)
             }
+        }
+        llVoiceContainer.setOnLongClickListener {
+            val message = mMessage
+                ?: return@setOnLongClickListener false
+
+            val consumed = ImUIKitImpl.getSessionListener()
+                ?.getItemLongClickListener()
+                ?.invoke(it, message)
+                ?: false
+
+            if (!consumed) {
+                showDefaultMessageActionDialog(
+                    itemView.context,
+                    message
+                )
+            }
+
+            true
         }
     }
 }

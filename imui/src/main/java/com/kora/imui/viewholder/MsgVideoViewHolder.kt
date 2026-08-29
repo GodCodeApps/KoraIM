@@ -51,22 +51,22 @@ class MsgVideoViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
             .centerCrop()
             .into(cover)
         duration.text = formatDuration(attachment.duration)
-        container.setOnClickListener {
-            if (source.isBlank()) return@setOnClickListener
-            val dialog = Dialog(view.context, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-            val videoView = VideoView(view.context)
-            dialog.setContentView(
-                videoView,
-                ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            )
-            videoView.setMediaController(MediaController(view.context).apply { setAnchorView(videoView) })
-            val uri = Uri.parse(source)
-            if (uri.scheme.isNullOrBlank()) videoView.setVideoPath(source) else videoView.setVideoURI(uri)
-            videoView.setOnPreparedListener { videoView.start() }
-            videoView.setOnCompletionListener { dialog.dismiss() }
-            dialog.setOnDismissListener { videoView.stopPlayback() }
-            dialog.show()
-        }
+//        container.setOnClickListener {
+//            if (source.isBlank()) return@setOnClickListener
+//            val dialog = Dialog(view.context, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+//            val videoView = VideoView(view.context)
+//            dialog.setContentView(
+//                videoView,
+//                ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+//            )
+//            videoView.setMediaController(MediaController(view.context).apply { setAnchorView(videoView) })
+//            val uri = Uri.parse(source)
+//            if (uri.scheme.isNullOrBlank()) videoView.setVideoPath(source) else videoView.setVideoURI(uri)
+//            videoView.setOnPreparedListener { videoView.start() }
+//            videoView.setOnCompletionListener { dialog.dismiss() }
+//            dialog.setOnDismissListener { videoView.stopPlayback() }
+//            dialog.show()
+//        }
     }
 
     private fun formatDuration(milliseconds: Long): String {

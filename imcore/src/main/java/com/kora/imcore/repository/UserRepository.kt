@@ -70,6 +70,20 @@ internal class UserRepository(
         scope.launch { dao.insertOrUpdateUserInfo(info) }
     }
 
+    /** Replace stale user data in both the memory cache and SQLite. */
+    fun update(info: UserInfo) {
+        if (info.account.isBlank()) return
+        cacheAndPersistAsync(info)
+    }
+
+    /** Batch variant used after the host app loads a complete friend list. */
+    fun updateAll(infos: List<UserInfo>) {
+        val validInfos = infos.filter { it.account.isNotBlank() }
+        if (validInfos.isEmpty()) return
+        validInfos.forEach { cache[it.account] = it }
+        scope.launch { dao.insertOrUpdateUserInfoList(validInfos) }
+    }
+
     /** 清空内存缓存（账号切换时调用） */
     fun clear() = cache.clear()
 }
