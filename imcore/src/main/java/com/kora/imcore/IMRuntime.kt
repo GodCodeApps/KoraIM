@@ -10,6 +10,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import com.kora.imcore.netty.SyncEvent
 import android.util.Log
+import com.kora.imcore.constant.MsgDirection
 
 /**
  * IM 运行时单例，作为 Netty 网络层和本地数据层之间的桥梁。
@@ -47,6 +48,11 @@ internal object IMRuntime {
      */
     fun incoming(message: Message) {
         scope.launch {
+            // The server stores one canonical message for both participants, so
+            // direction must always be derived from the currently logged-in owner.
+            // Trusting the wire value makes server-generated messages (such as call
+            // records) appear on the wrong side for their sender.
+            message.direct = if (message.senderId == ownerId) MsgDirection.OUT else MsgDirection.IN
             if (message.sessionId.isNotBlank()) messages.confirm(message, ownerId)
             else messages.upsert(message)
             IMEventHub.emitIncoming(message)

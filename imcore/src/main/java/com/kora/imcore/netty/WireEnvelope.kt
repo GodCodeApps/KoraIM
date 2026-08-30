@@ -2,6 +2,7 @@ package com.kora.imcore.netty
 
 import com.google.gson.Gson
 import com.kora.imcore.db.Message
+import com.kora.imcore.call.CallSignal
 
 /**
  * 网络传输的通信信封（Wire Protocol），定义了客户端与服务器之间的 JSON 帧格式。
@@ -47,7 +48,8 @@ internal data class WireEnvelope(
     val senderId: String? = null,
     val requestId: String? = null,
     val errorCode: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val callSignal: CallSignal? = null
 ) {
     /** 序列化为 JSON 并追加换行符（NDJSON 格式） */
     fun encode(gson: Gson): String = gson.toJson(this) + "\n"
@@ -64,6 +66,7 @@ internal data class WireEnvelope(
         const val TYPE_TYPING = "typing"
         const val TYPE_RECALL = "recall"
         const val TYPE_RECALL_ACK = "recall_ack"
+        const val TYPE_CALL_SIGNAL = "call_signal"
 
         /** 构建消息帧 */
         fun message(message: Message) = WireEnvelope(TYPE_MESSAGE, message.messageId, message)
@@ -76,6 +79,7 @@ internal data class WireEnvelope(
         fun recall(messageId: String, requestId: String) = WireEnvelope(
             type = TYPE_RECALL, messageId = messageId, requestId = requestId
         )
+        fun call(signal: CallSignal) = WireEnvelope(type = TYPE_CALL_SIGNAL, callSignal = signal)
 
         /** 构建同步请求帧 */
         fun sync(cursor: Long) = WireEnvelope(type = TYPE_SYNC, cursor = cursor)

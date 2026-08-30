@@ -45,6 +45,7 @@ internal class ConnectionManager(private val context: Context) {
             proxy.sendTyping(receiverId)
         }
     }
+    fun sendCallSignal(signal: com.kora.imcore.call.CallSignal): Boolean = bound && proxy.sendCallSignal(signal)
 
     fun recall(messageId: String, requestId: String, callback: (com.kora.imcore.netty.PendingRecallRegistry.Result) -> Unit) {
         proxy.recall(messageId, requestId, callback)

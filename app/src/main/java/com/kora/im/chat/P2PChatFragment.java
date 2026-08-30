@@ -58,6 +58,14 @@ public class P2PChatFragment extends IMessageFragment {
     @Override
     public void onMoreOptionClick(@NotNull String optionName) {
         super.onMoreOptionClick(optionName);
+        if ("语音通话".equals(optionName)) {
+            com.kora.imcall.IMCall.INSTANCE.startAudioCall(requireContext(), getPeerId());
+            return;
+        }
+        if ("视频通话".equals(optionName)) {
+            com.kora.imcall.IMCall.INSTANCE.startVideoCall(requireContext(), getPeerId());
+            return;
+        }
         if ("个人名片".equals(optionName)) {
             showCardSelectorDialog();
         } else if ("位置".equals(optionName)) {

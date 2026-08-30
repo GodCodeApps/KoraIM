@@ -46,6 +46,7 @@ internal class ImServiceProxy : ServiceConnection {
     fun sendTyping(receiverId: String) {
         service?.sendTyping(receiverId)
     }
+    fun sendCallSignal(signal: com.kora.imcore.call.CallSignal): Boolean = service?.sendCallSignal(signal) == true
 
     fun recall(messageId: String, requestId: String, callback: (com.kora.imcore.netty.PendingRecallRegistry.Result) -> Unit) {
         service?.recall(messageId, requestId, callback)

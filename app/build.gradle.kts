@@ -44,4 +44,5 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     implementation(libs.glide)
     implementation(project(":imui"))
+    implementation(project(":imcall"))
 }

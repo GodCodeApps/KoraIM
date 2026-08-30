@@ -1,11 +1,52 @@
 // Copyright 2026 GodCodeApps. Licensed under the Apache License, Version 2.0.
 const net = require('net');
+const crypto = require('crypto');
 const config = require('./config');
 const { createStorage } = require('./storage');
 
 const PORT = config.port;
 const clients = new Map();
+const activeCalls = new Map();
+const userCalls = new Map();
 const storage = createStorage(config);
+
+function releaseCall(callId) {
+    const call = activeCalls.get(callId);
+    if (!call) return;
+    activeCalls.delete(callId);
+    if (userCalls.get(call.caller) === callId) userCalls.delete(call.caller);
+    if (userCalls.get(call.callee) === callId) userCalls.delete(call.callee);
+    if (call.timer) clearTimeout(call.timer);
+}
+
+async function persistCallRecord(callId, call, action, actorId) {
+    if (!call || call.recorded) return;
+    call.recorded = true;
+    const now = Date.now();
+    const completed = action === 'hangup' && Boolean(call.acceptedAt);
+    const result = completed ? 'completed' : ({
+        reject: 'rejected', cancel: 'cancelled', timeout: 'missed', busy: 'busy'
+    }[action] || 'interrupted');
+    const attachment = JSON.stringify({
+        callId,
+        callType: call.callType || 'audio',
+        result,
+        callerId: call.caller,
+        calleeId: call.callee,
+        actorId,
+        durationSeconds: completed ? Math.max(0, Math.floor((now - call.acceptedAt) / 1000)) : 0,
+        endedAt: now
+    });
+    const saved = await storage.saveMessageAndEvents(call.caller, call.callee, {
+        messageId: crypto.randomUUID(), sessionType: 1, type: 10,
+        attachment, extra: '', status: 1, time: now
+    });
+    for (const account of [call.caller, call.callee]) {
+        clients.get(account)?.forEach(client => writeFrame(client, {
+            type: 'message', messageId: saved.fullMessage.messageId, payload: saved.fullMessage
+        }));
+    }
+}
 
 function writeFrame(socket, frame) {
     if (!socket.destroyed) {
@@ -110,6 +151,58 @@ async function handleFrame(socket, line) {
             return;
         }
 
+        if (envelope.type === 'call_signal') {
+            if (!socket.account) throw new Error('Login required');
+            const signal = envelope.callSignal || {};
+            const receiverId = String(signal.receiverId || '').trim();
+            const callId = String(signal.callId || '').trim();
+            const action = String(signal.action || '').trim();
+            if (!receiverId || !callId || !action || receiverId === socket.account) {
+                throw new Error('Invalid call signal');
+            }
+            const routed = { ...signal, senderId: socket.account, receiverId, callId, action, timestamp: Date.now() };
+            if (action === 'invite') {
+                if (userCalls.has(socket.account) || userCalls.has(receiverId)) {
+                    writeFrame(socket, { type: 'call_signal', callSignal: {
+                        ...routed, action: 'busy', senderId: receiverId, receiverId: socket.account
+                    }});
+                    await persistCallRecord(callId, {
+                        caller: socket.account, callee: receiverId, callType: signal.callType || 'audio', recorded: false
+                    }, 'busy', receiverId);
+                    return;
+                }
+                const call = { caller: socket.account, callee: receiverId, callType: signal.callType || 'audio', startedAt: Date.now(), acceptedAt: 0, timer: null, recorded: false };
+                call.timer = setTimeout(() => releaseCall(callId), 60000);
+                activeCalls.set(callId, call);
+                userCalls.set(socket.account, callId);
+                userCalls.set(receiverId, callId);
+            } else {
+                const call = activeCalls.get(callId);
+                if (!call || ![call.caller, call.callee].includes(socket.account) || ![call.caller, call.callee].includes(receiverId)) {
+                    throw new Error('Invalid or expired call');
+                }
+                if (action === 'accept' && !call.acceptedAt) call.acceptedAt = Date.now();
+            }
+            const targets = clients.get(receiverId);
+            const activeTargets = targets ? [...targets].filter(client => !client.destroyed) : [];
+            if (!activeTargets.length && action === 'invite') {
+                writeFrame(socket, { type: 'call_signal', callSignal: {
+                    ...routed, action: 'busy', senderId: receiverId, receiverId: socket.account,
+                    payload: JSON.stringify({ reason: 'offline' })
+                }});
+                await persistCallRecord(callId, activeCalls.get(callId), 'busy', receiverId);
+                releaseCall(callId);
+                return;
+            }
+            activeTargets.forEach(client => writeFrame(client, { type: 'call_signal', callSignal: routed }));
+            if (['reject', 'cancel', 'hangup', 'busy', 'timeout'].includes(action)) {
+                const call = activeCalls.get(callId);
+                await persistCallRecord(callId, call, action, socket.account);
+                releaseCall(callId);
+            }
+            return;
+        }
+
         // 6. 发送即时消息
         if (envelope.type !== 'message' || !envelope.payload || !envelope.messageId) {
             throw new Error('Unsupported frame');
@@ -154,11 +247,24 @@ async function handleFrame(socket, line) {
     }
 }
 
-function removeClient(socket) {
+async function removeClient(socket) {
     if (socket.account) {
         const accountSockets = clients.get(socket.account);
         accountSockets?.delete(socket);
-        if (accountSockets?.size === 0) clients.delete(socket.account);
+        if (accountSockets?.size === 0) {
+            clients.delete(socket.account);
+            const callId = userCalls.get(socket.account);
+            const call = callId ? activeCalls.get(callId) : null;
+            if (call) {
+                const peerId = call.caller === socket.account ? call.callee : call.caller;
+                clients.get(peerId)?.forEach(client => writeFrame(client, { type: 'call_signal', callSignal: {
+                    callId, action: 'hangup', senderId: socket.account, receiverId: peerId,
+                    callType: '', payload: JSON.stringify({ reason: 'disconnected' }), timestamp: Date.now()
+                }}));
+                await persistCallRecord(callId, call, 'disconnected', socket.account);
+                releaseCall(callId);
+            }
+        }
         console.log(`[-] ${socket.account} disconnected`);
     }
 }

@@ -12,6 +12,7 @@ import com.kora.imui.attachment.TipAttachment
 import com.kora.imui.attachment.VideoAttachment
 import com.kora.imui.attachment.FileAttachment
 import com.kora.imui.attachment.VoiceAttachment
+import com.kora.imui.attachment.CallAttachment
 
 /**
  * 会话列表最后一条消息摘要格式化器：
@@ -62,6 +63,7 @@ object ConversationDigestFormatter : IMConversationDigestProvider {
             is VideoAttachment -> "[视频]"
             is FileAttachment -> "[文件] ${attachment.name}".trim()
             is VoiceAttachment -> "[语音]"
+            is CallAttachment -> attachment.digest(currentOwnerId.orEmpty())
             is com.kora.imui.attachment.CardAttachment -> {
                 if (attachment.nickname.isNotBlank()) "[个人名片] ${attachment.nickname}" else "[个人名片]"
             }

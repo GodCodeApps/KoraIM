@@ -17,6 +17,7 @@ refreshLayout="1.1.0"
 kotlin = "2.2.10"
 glide = "4.16.0"
 pictureselector="v3.11.2"
+webrtc="1.0.43591"
 
 
 [libraries]
@@ -35,6 +36,7 @@ lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtim
 refreshLayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "refreshLayout" }
 glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "glide" }
 pictureselector = { group = "io.github.lucksiege", name = "pictureselector", version.ref = "pictureselector" }
+webrtc = { group = "com.infobip", name = "google-webrtc", version.ref = "webrtc" }
 
 
 [plugins]

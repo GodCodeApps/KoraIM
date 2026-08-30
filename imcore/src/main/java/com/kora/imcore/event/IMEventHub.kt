@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.kora.imcore.call.CallSignal
 
 /**
  * IM 内部事件总线，集中管理所有需要跨层传递的实时事件。
@@ -32,11 +33,13 @@ internal object IMEventHub {
 
     /** 对方正在输入事件流（携带 senderId，缓冲 16 条，满时丢弃最旧的） */
     private val _typingEvents = MutableSharedFlow<String>(extraBufferCapacity = 16, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    private val _callSignals = MutableSharedFlow<CallSignal>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     val incomingMessages = _incomingMessages.asSharedFlow()
     val messageUpdates = _messageUpdates.asSharedFlow()
     val connectionState = _connectionState.asStateFlow()
     val typingEvents = _typingEvents.asSharedFlow()
+    val callSignals = _callSignals.asSharedFlow()
 
     /** 发射新消息事件（由 [IMRuntime.incoming] 调用） */
     fun emitIncoming(message: Message) { _incomingMessages.tryEmit(message) }
@@ -46,6 +49,7 @@ internal object IMEventHub {
 
     /** 发射正在输入事件（由 [ChatClientHandler] 调用） */
     fun emitTyping(senderId: String) { _typingEvents.tryEmit(senderId) }
+    fun emitCallSignal(signal: CallSignal) { _callSignals.tryEmit(signal) }
 
     /** 更新连接状态（由 [IMService] 和 [ImServiceProxy] 调用） */
     fun setConnectionState(state: ConnectionState) { _connectionState.value = state }

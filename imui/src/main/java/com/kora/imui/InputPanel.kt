@@ -7,6 +7,7 @@ import android.provider.OpenableColumns
 import androidx.fragment.app.Fragment
 import com.kora.imcore.ImSdkImpl
 import com.kora.imcore.constant.MsgDirection
+import com.kora.imcore.constant.MsgType
 import com.kora.imcore.constant.SessionType
 import com.kora.imcore.db.Message
 import com.kora.imui.MessageBuilder.createTextMessage
@@ -147,6 +148,7 @@ class InputPanel(
     }
 
     fun quoteMessage(message: IMMessage) {
+        if (message.getMsgType() == MsgType.CALL) return
         val info = IMClient.userInfoProvider?.getUserInfo(message.senderId)
         val name = info?.nickname?.takeIf { it.isNotBlank() } ?: message.senderId
         pendingQuote = MessageQuote.fromMessage(message, name)

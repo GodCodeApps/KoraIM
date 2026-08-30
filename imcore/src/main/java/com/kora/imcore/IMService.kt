@@ -14,6 +14,7 @@ import com.kora.imcore.db.Message
 import com.kora.imcore.netty.ChatClientInitializer
 import com.kora.imcore.netty.PendingAckRegistry
 import com.kora.imcore.netty.PendingRecallRegistry
+import com.kora.imcore.call.CallSignal
 import com.kora.imcore.netty.WireEnvelope
 import com.kora.imcore.event.ConnectionState
 import com.kora.imcore.event.IMEventHub
@@ -114,6 +115,12 @@ class IMService : Service() {
     internal fun sendTyping(receiverId: String) {
         val activeChannel = channel?.takeIf { it.isActive } ?: return
         activeChannel.writeAndFlush(WireEnvelope.typing(receiverId).encode(gson))
+    }
+
+    internal fun sendCallSignal(signal: CallSignal): Boolean {
+        val activeChannel = channel?.takeIf { it.isActive } ?: return false
+        activeChannel.writeAndFlush(WireEnvelope.call(signal).encode(gson))
+        return true
     }
 
     internal fun recall(messageId: String, requestId: String, callback: (PendingRecallRegistry.Result) -> Unit) {

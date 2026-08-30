@@ -91,6 +91,7 @@ internal class ChatClientHandler(
                         IMEventHub.emitTyping(senderId)
                     }
                 }
+                WireEnvelope.TYPE_CALL_SIGNAL -> envelope.callSignal?.let(IMEventHub::emitCallSignal)
                 else -> Log.w(TAG, "Ignoring unknown frame type: ${envelope.type}")
             }
         } catch (error: Exception) {

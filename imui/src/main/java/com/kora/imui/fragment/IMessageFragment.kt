@@ -180,6 +180,7 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
     }
 
     fun quoteMessage(message: IMMessage) {
+        if (message.getMsgType() == com.kora.imcore.constant.MsgType.CALL) return
         inputPanel?.quoteMessage(message)
     }
 

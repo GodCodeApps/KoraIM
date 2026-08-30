@@ -15,6 +15,7 @@ import com.kora.imui.IMMediaMessageSender
 import com.kora.imui.ImUIKitImpl
 import com.kora.imui.listener.SessionEventListener
 import com.kora.imui.notification.IMNotificationManager
+import com.kora.imcall.IMCall
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -46,6 +47,7 @@ class MainActivity : AppCompatActivity() {
     private fun initializeClient(account: String) {
         ImSdkImpl.setAccount(account)
         IMClient.init(applicationContext, SERVER_HOST, SERVER_PORT)
+        IMCall.init(applicationContext)
         ImUIKitImpl.setMediaMessageProvider(AppMediaMessageProvider())
         IMNotificationManager.init(this, com.kora.im.chat.ChatActivity::class.java)
         IMNotificationManager.requestNotificationPermission(this)
@@ -98,7 +100,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         // Development machine's WLAN address. The phone and computer must be on
         // the same LAN; update this value if the computer's DHCP address changes.
-        private const val SERVER_HOST = "192.168.1.6"
+        private const val SERVER_HOST = "192.168.1.48"
         private const val SERVER_PORT = 8090
         private const val STATE_ACCOUNT = "current_account"
     }

@@ -6,8 +6,13 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.kora.im.chat.MessageFragment
+import com.kora.imcore.IMClient
+import kotlinx.coroutines.launch
 
 class HomeFragment : Fragment() {
 
@@ -28,6 +33,7 @@ class HomeFragment : Fragment() {
         }
 
         val bottomNav = view.findViewById<BottomNavigationView>(R.id.bottom_nav)
+        observeUnreadBadge(bottomNav)
 
         // Default tab: conversations
         if (childFragmentManager.findFragmentById(R.id.home_content) == null) {
@@ -37,6 +43,24 @@ class HomeFragment : Fragment() {
         bottomNav.setOnItemSelectedListener { item ->
             showTab(item.itemId)
             true
+        }
+    }
+
+    private fun observeUnreadBadge(bottomNav: BottomNavigationView) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                IMClient.observeTotalUnreadCount().collect { count ->
+                    if (count <= 0) {
+                        bottomNav.removeBadge(R.id.tab_chat)
+                    } else {
+                        bottomNav.getOrCreateBadge(R.id.tab_chat).apply {
+                            isVisible = true
+                            number = count
+                            maxCharacterCount = 3 // Material displays counts above 99 as 99+.
+                        }
+                    }
+                }
+            }
         }
     }
 

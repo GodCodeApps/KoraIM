@@ -287,6 +287,7 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
         val msg = message ?: return
         val options = mutableListOf<String>()
         val actions = mutableListOf<() -> Unit>()
+        val isCallRecord = msg.getMsgType() == MsgType.CALL
 
         val attachment = msg.getAttachment()
         val textContent = when (attachment) {
@@ -304,16 +305,19 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
             }
         }
 
-        options.add("转发")
-        actions.add { ImUIKitImpl.getSessionListener()?.getForwardMessageListener()?.invoke(msg) }
+        if (!isCallRecord) {
+            options.add("转发")
+            actions.add { ImUIKitImpl.getSessionListener()?.getForwardMessageListener()?.invoke(msg) }
 
-        options.add("引用")
-        actions.add {
-            QuoteActionDispatcher.onQuote?.invoke(msg)
+            options.add("引用")
+            actions.add {
+                QuoteActionDispatcher.onQuote?.invoke(msg)
+            }
         }
 
         val canRecall = msg.getMsgDirection() == MsgDirection.OUT &&
             msg.getMsgStatus() == MsgStatus.SUCCESS &&
+            !isCallRecord &&
             !msg.getMessage().recalled &&
             System.currentTimeMillis() - msg.getMsgTime() <= 2 * 60 * 1000L
         if (canRecall) {

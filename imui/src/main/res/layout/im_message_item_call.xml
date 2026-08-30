@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/call_message_content"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="4dp">
+    <ImageView android:id="@+id/tv_call_icon" android:layout_width="20dp"
+        android:layout_height="20dp" android:contentDescription="通话类型"
+        android:scaleType="centerInside" android:tint="#262626" />
+    <TextView android:id="@+id/tv_call_content" android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#333333" android:textSize="16sp" />
+</LinearLayout>

@@ -8,3 +8,4 @@ com.kora.imui.attachment.RedPacketAttachment
 com.kora.imui.attachment.TipAttachment
 com.kora.imui.attachment.CardAttachment
 com.kora.imui.attachment.LocationAttachment
+com.kora.imui.attachment.CallAttachment
