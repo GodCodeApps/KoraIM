@@ -2,337 +2,425 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com)
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9%2B-purple.svg)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-Android-purple.svg)](https://kotlinlang.org)
 
-**KoraIM** 是由 **GodCodeApps** 开源的轻量级、高性能、易扩展的 Android 即时通讯（IM）SDK 框架。架构设计上实现了 **通信内核（imcore）** 与 **UI 组件（imui）** 的彻底解耦，帮助 Android 开发者在 **5 分钟内快速搭建具备微信级交互体验的聊天系统**。
+KoraIM 是一个模块化的 Android 即时通讯示例工程，包含通信内核、聊天 UI、WebRTC 实时语音/视频通话、Android Demo 和 Node.js 联调服务端。
 
----
+项目适合用于学习 IM 架构、快速搭建业务原型，以及二次开发自己的聊天 SDK。当前服务端是联调实现，正式上线前仍需补充鉴权、TLS、限流、监控、推送和 TURN 等生产能力。
 
-## 📸 效果预览
+## 效果预览
 
 <div align="center">
   <img src="screenshot/Screenshot_20260822_084229.png" width="48%" />
   <img src="screenshot/Screenshot_20260822_084252.png" width="48%" />
-  <br/>
+  <br />
   <img src="screenshot/Screenshot_20260822_084336.png" width="48%" />
   <img src="screenshot/Screenshot_20260822_084402.png" width="48%" />
 </div>
 
----
+## 已实现功能
 
-## 🌟 核心特性
+### 消息与会话
 
-- 🚀 **极简集成**：只需设置账号与初始化两步，即可拥有完整的收发消息、离线存储、会话管理与全套 UI。
-- 💬 **微信级交互体验**：
-  - **无缝软键盘/面板切换**：动态记忆真实软键盘高度，杜绝切换表情/更多面板时的闪烁跳动与多层堆叠。
-  - **录音 HUD 实时波形**：按住说话弹出半透明 HUD，支持 6 级麦克风实时音量跳动波形与上滑取消视觉反馈。
-  - **富媒体气泡支持**：内置文本、Emoji、图片自适应宽高比、语音动态宽度与播放动画、视频弹窗播放、3D 翻转拆红包、居中提示消息。
-  - **网络状态条**：会话列表顶部展示类似微信的网络连接状态栏（连接中/重连中/断开警告），支持一键跳转网络设置。
-- 🛡️ **高可靠通信引擎**：
-  - **TCP 长连接与应用层心跳保活**：定时保活监测，防止 NAT 超时断连。
-  - **智能重连机制**：具备指数退避策略与网络状态变化感知，断网恢复秒级重连。
-  - **端到端 ACK 可靠确认**：严格的消息 ID 追踪，发送超时自动标记为失败，支持一键重发。
-- 🔄 **全响应式数据流**：基于 SQLite + Kotlin Coroutines & StateFlow/SharedFlow，底层数据变更自动驱动 UI 秒级响应刷新。
-- 🧩 **高可扩展 SPI 设计**：多媒体文件上传与自定义消息附件均基于 SPI 抽象，无缝对接任意 OSS/文件服务器，支持无侵入扩展自定义消息卡片。
+- 文本、Emoji、图片、语音、视频、文件、位置、名片、红包和提示消息
+- 消息发送 ACK、失败状态和重新发送
+- TCP 长连接、心跳、断线重连和网络状态监听
+- SQLite 持久化、会话列表、分页历史消息和响应式数据流
+- 基于游标的增量同步与离线消息补拉
+- 会话未读数、总未读数和底部消息 Tab 的 `99+` 角标
+- 正在输入状态
+- 消息转发、引用、引用定位
+- 两分钟内撤回、双方同步撤回结果及重新编辑入口
+- 本地删除消息和删除会话
+- SPI 自定义消息附件与自定义气泡
 
----
+### 实时语音与视频
 
-## 📦 模块分层
+- 独立 `imcall` 模块，媒体基于 WebRTC，信令复用 `imcore` 长连接
+- 一对一语音通话和视频通话
+- 呼叫、响铃、接听、拒绝、取消、挂断、忙线和 45 秒无人接听
+- 静音、扬声器、前后摄像头切换和通话计时
+- 视频全屏远端画面和右上角本地预览
+- 通话页复用聊天用户资料、昵称和头像
+- 服务端维护通话占用状态，避免同一用户同时进入多路通话
+- 通话结束由服务端生成唯一 `CALL` 消息，支持实时投递和离线同步
+- 通话记录展示已取消、已拒绝、未接听、忙线、异常中断和通话时长
+- 通话记录只允许本地删除，不支持转发、引用和撤回
 
-```
+> WebRTC 默认只配置 STUN，适合局域网和能够建立 P2P 连接的网络。复杂 NAT、跨运营商网络和生产环境必须部署 TURN 中继。锁屏来电、后台可靠唤醒和系统级来电通知仍需结合厂商推送或统一推送服务完善。
+
+## 模块结构
+
+```text
 KoraIM
-├── imcore        # 【核心通信库】TCP 长连接管理、心跳保活、ACK 确认、SQLite 本地持久化、响应式数据流
-├── imui          # 【UI 组件库】微信交互风格输入框、消息气泡列表、录音 HUD、会话列表、开箱即用 Base Fragment
-├── app           # 【接入示例 Demo】包含单聊会话、消息列表、多媒体发送的完整实现演示
-└── server        # 【本地联调服务】基于 Node.js 实现的轻量 TCP 示例服务端（仅供本地开发联调）
+├── imcore      通信核心：TCP、信令、ACK、重连、增量同步、SQLite、消息与会话 API
+├── imui        聊天 UI：会话列表、消息列表、输入面板、附件、气泡、引用与撤回交互
+├── imcall      实时通话：WebRTC 音视频、通话状态机和通话 Activity
+├── app         Android 示例：登录、联系人、单聊入口、底部未读角标和模块集成
+└── im-server   Node.js 联调服务：消息持久化、离线同步、撤回和通话信令
 ```
 
----
+推荐依赖方向：
 
-## 🚀 5 分钟快速接入教程
-
-### 1. 声明权限与 Activity 配置
-
-在你的 `AndroidManifest.xml` 中添加网络与多媒体所需权限，并务必为聊天 Activity 添加 `windowSoftInputMode="adjustResize"`：
-
-```xml
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 基础网络权限 -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    
-    <!-- 语音与多媒体权限 -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <!-- Android 12 及以下读写存储权限 -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
-
-    <application ...>
-        <!-- 聊天页面配置 adjustResize 确保键盘与输入面板无缝切换 -->
-        <activity
-            android:name=".chat.ChatActivity"
-            android:windowSoftInputMode="adjustResize" />
-    </application>
-</manifest>
+```text
+app ──> imui ──> imcore
+ └────> imcall ─> imcore
 ```
 
-### 2. 初始化 SDK 与配置 Provider
+`imcall` 不依赖 `imui`。它通过 `imcore` 获取用户资料和发送通话信令，业务 App 可以独立替换聊天 UI 或通话 UI。
 
-在登录成功或进入主界面时，设置账号并完成 SDK 初始化：
+## 环境与构建
+
+- Android minSdk 24
+- Java 11 字节码目标
+- Android Gradle Kotlin DSL
+- Node.js 联调服务端
+- SQLite 或 MySQL 服务端存储（参见 `im-server/config.js`）
+
+构建 Debug APK：
+
+```bash
+./gradlew :app:assembleDebug
+```
+
+Windows：
+
+```powershell
+.\gradlew.bat :app:assembleDebug
+```
+
+## 快速接入
+
+### 1. 引入模块
+
+`settings.gradle.kts`：
 
 ```kotlin
-// 1. 设置当前登录账号（必须在 IMClient.init 之前调用）
-ImSdkImpl.setAccount(currentAccount)
-
-// 2. 初始化 IM 核心引擎 (配置服务器 IP 和端口)
-IMClient.init(applicationContext, host = "192.168.1.9", port = 8090)
-
-// 3. 配置多媒体文件上传 Provider (图片、语音、视频上传)
-ImUIKitImpl.setMediaMessageProvider(object : IMMediaMessageProvider {
-    override suspend fun uploadImage(request: ImageUploadRequest): ImageUploadResult {
-        val remoteUrl = uploadToOss(request.localPath)
-        return ImageUploadResult(remoteUrl)
-    }
-
-    override suspend fun uploadVideo(request: VideoUploadRequest): VideoUploadResult {
-        val videoUrl = uploadToOss(request.localVideoPath)
-        val coverUrl = uploadToOss(request.localCoverPath)
-        return VideoUploadResult(videoUrl, coverUrl)
-    }
-
-    override suspend fun uploadVoice(request: VoiceUploadRequest): VoiceUploadResult {
-        val voiceUrl = uploadToOss(request.localPath)
-        return VoiceUploadResult(voiceUrl)
-    }
-})
-
-// 4. 配置用户信息 Provider (头像、昵称提供器)
-IMClient.userInfoProvider = object : IMUserInfoProvider {
-    override fun getUserInfo(account: String): UserInfo? {
-        return findLocalUser(account) // 从本地缓存/数据库同步获取
-    }
-
-    override fun fetchUserInfoFromServer(account: String, callback: (UserInfo?) -> Unit) {
-        fetchRemoteUser(account) { callback(it) } // 异步从业务服务器拉取
-    }
-}
-
-// 5. 配置会话全局事件监听（头像点击、失败重发等）
-ImUIKitImpl.setSessionEventListener(SessionEventListener().apply {
-    onAvatarClickListener { view, account: String? ->
-        Toast.makeText(context, "点击了用户头像: $account", Toast.LENGTH_SHORT).show()
-    }
-    onResendClickListener { view, message: IMMessage? ->
-        (message as? Message)?.let {
-            lifecycleScope.launch {
-                if (IMMediaMessageSender.isMedia(it)) {
-                    IMMediaMessageSender.send(it)
-                } else {
-                    it.status = MsgStatus.SENDING
-                    IMClient.sendMessage(it)
-                }
-            }
-        }
-    }
-})
+include(":imcore")
+include(":imui")
+include(":imcall")
 ```
 
-### 3. 会话列表接入 (`IConversationListFragment`)
+业务模块：
 
-继承 `IConversationListFragment`，只需重写点击事件路由：
+```kotlin
+dependencies {
+    implementation(project(":imui"))
+    implementation(project(":imcall"))
+}
+```
+
+`imui` 和 `imcall` 都会暴露其所需的 `imcore` 能力，不需要让二者互相依赖。
+
+### 2. 初始化消息与通话
+
+必须先设置账号，再初始化 `IMClient`：
+
+```kotlin
+ImSdkImpl.setAccount(account)
+IMClient.init(applicationContext, host = "192.168.1.6", port = 8090)
+IMCall.init(applicationContext)
+```
+
+退出登录或销毁 SDK：
+
+```kotlin
+IMClient.release()
+```
+
+### 3. 配置用户资料
+
+聊天列表、消息头像和通话页面共用 `IMUserInfoProvider`：
+
+```kotlin
+IMClient.userInfoProvider = object : IMUserInfoProvider {
+    override fun getUserInfo(account: String): UserInfo? = findLocalUser(account)
+
+    override fun fetchUserInfoFromServer(
+        account: String,
+        callback: (UserInfo?) -> Unit
+    ) {
+        fetchRemoteUser(account, callback)
+    }
+}
+```
+
+也可以主动更新缓存与本地用户表：
+
+```kotlin
+IMClient.updateUserInfo(userInfo)
+IMClient.updateUserInfos(userInfoList)
+```
+
+### 4. 配置媒体上传
+
+图片、文件、录音和普通视频消息需要业务侧提供上传实现：
+
+```kotlin
+ImUIKitImpl.setMediaMessageProvider(AppMediaMessageProvider())
+```
+
+发送媒体消息：
+
+```kotlin
+IMMediaMessageSender.send(message)     // 挂起直到上传和发送完成
+IMMediaMessageSender.enqueue(message)  // 交给后台队列
+IMMediaMessageSender.isMedia(message)  // 判断是否为媒体消息
+```
+
+### 5. 挂载会话列表与聊天页
 
 ```kotlin
 class MessageFragment : IConversationListFragment() {
-
     override fun onConversationClick(conversation: Conversation) {
-        val intent = Intent(activity, ChatActivity::class.java).apply {
+        startActivity(Intent(requireContext(), ChatActivity::class.java).apply {
             putExtra("session_type", conversation.sessionType)
             putExtra("session_id", conversation.sessionId)
             putExtra("peer_id", conversation.peerId)
-        }
-        startActivity(intent)
+        })
     }
 }
 ```
 
-### 4. 聊天页面接入 (`IMessageFragment`)
+```kotlin
+class P2PChatFragment : IMessageFragment()
+```
 
-在 `ChatActivity` 中挂载继承自 `IMessageFragment` 的 Fragment：
+聊天 Fragment 参数：
 
 ```kotlin
-// 1. 定义聊天 Fragment
-class P2PChatFragment : IMessageFragment()
+Bundle().apply {
+    putInt("session_type", SessionType.P2P)
+    putString("session_id", sessionId)
+    putString("peer_id", peerId)
+}
+```
 
-// 2. 在 ChatActivity 中传递参数启动
-class ChatActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_chat)
+### 6. 发起语音或视频通话
 
-        val fragment = P2PChatFragment().apply {
-            arguments = Bundle().apply {
-                putInt("session_type", intent.getIntExtra("session_type", SessionType.P2P))
-                putString("session_id", intent.getStringExtra("session_id"))
-                putString("peer_id", intent.getStringExtra("peer_id"))
+```kotlin
+IMCall.startAudioCall(requireContext(), peerId)
+IMCall.startVideoCall(requireContext(), peerId)
+```
+
+呼入页面由 `IMCall` 收到邀请后自动打开。通话页内部使用：
+
+```kotlin
+IMCall.accept()
+IMCall.reject()
+IMCall.hangup()
+```
+
+监听通话状态：
+
+```kotlin
+lifecycleScope.launch {
+    IMCall.session.collect { session: CallSession? ->
+        // OUTGOING / INCOMING / CONNECTING / CONNECTED / ENDED
+    }
+}
+```
+
+## 核心 API
+
+### IMClient：连接与事件
+
+| API | 说明 |
+|---|---|
+| `init(context, host, port)` | 初始化数据库、通信服务和增量同步 |
+| `release()` | 断开连接并释放当前账号运行时资源 |
+| `connectionState` | `StateFlow<ConnectionState>` 连接状态 |
+| `incomingMessages` | 新消息 `SharedFlow<Message>` |
+| `messageUpdates` | 消息状态、撤回等更新流 |
+| `typingEvents` | 对方正在输入事件流 |
+| `callSignals` | `SharedFlow<CallSignal>` 原始通话信令流 |
+| `sendTyping(receiverId)` | 发送正在输入状态 |
+| `sendCallSignal(signal)` | 发送底层通话信令；通常由 `IMCall` 调用 |
+
+### IMClient：消息
+
+| API | 说明 |
+|---|---|
+| `sendMessage(message)` | 入库、发送并等待 ACK |
+| `saveMessage(message)` | 仅保存或更新本地消息 |
+| `saveMessages(messages)` | 批量保存本地消息 |
+| `getMessage(messageId)` | 同步查询本地消息 |
+| `getMessageById(messageId)` | 挂起查询本地消息 |
+| `getMessagePage(sessionId, page)` | 分页读取历史消息 |
+| `observeMessages(sessionId)` | 观察指定 `sessionId` 的消息 |
+| `observeP2PMessages(peerId)` | 观察与指定用户的 P2P 消息 |
+| `observeLastMessage(sessionId)` | 观察会话最新消息 |
+| `deleteMessage(messageId)` | 仅删除当前账号的本地记录 |
+| `recallMessage(messageId)` | 请求服务端撤回，返回 `RecallResult` |
+
+撤回规则：只有当前账号发送、已成功、未撤回且发送时间不超过两分钟的消息可撤回。`MsgType.CALL` 通话记录不能撤回。
+
+### IMClient：会话、未读和用户
+
+| API | 说明 |
+|---|---|
+| `getP2PConversation(peerId)` | 查询与指定用户的 P2P 会话 |
+| `getConversations()` | 查询当前账号全部会话 |
+| `observeConversations()` | 观察会话列表 |
+| `observeTotalUnreadCount()` | 观察全部会话未读总数 |
+| `addUnreadCountListener(listener)` | Java 未读监听，返回可取消订阅 |
+| `markConversationRead(sessionId)` | 清空指定会话未读数 |
+| `deleteConversation(sessionId)` | 删除当前账号的本地会话及其消息 |
+| `getUserInfo(account)` | 内存、SQLite、Provider 三级用户资料查询 |
+| `updateUserInfo(info)` | 更新单个用户资料 |
+| `updateUserInfos(infos)` | 批量更新用户资料 |
+
+底部消息 Tab 角标示例：
+
+```kotlin
+lifecycleScope.launch {
+    repeatOnLifecycle(Lifecycle.State.STARTED) {
+        IMClient.observeTotalUnreadCount().collect { count ->
+            if (count == 0) bottomNav.removeBadge(R.id.tab_chat)
+            else bottomNav.getOrCreateBadge(R.id.tab_chat).apply {
+                number = count
+                maxCharacterCount = 3 // 超过 99 显示 99+
             }
         }
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, fragment)
-            .commit()
     }
 }
 ```
 
----
+### IMCall
 
-## 📖 核心 API 说明
+| API / 属性 | 说明 |
+|---|---|
+| `init(context)` | 初始化通话控制器并订阅 `imcore` 信令 |
+| `startAudioCall(context, peerId)` | 发起一对一语音通话 |
+| `startVideoCall(context, peerId)` | 发起一对一视频通话 |
+| `accept()` | 接听当前呼入 |
+| `reject()` | 拒绝当前呼入 |
+| `hangup()` | 取消呼出或挂断当前通话 |
+| `session` | `StateFlow<CallSession?>` 当前通话状态 |
 
-### 1. 通信与连接控制 (`IMClient` / `ImSdkImpl`)
+`CallPhase` 包括：`IDLE`、`OUTGOING`、`INCOMING`、`CONNECTING`、`CONNECTED`、`ENDED`。
 
-| API / 属性 | 作用说明 |
-|:---|:---|
-| `ImSdkImpl.setAccount(account)` | 设置当前登录账号（**必须在 `IMClient.init` 之前调用**） |
-| `ImSdkImpl.getAccount()` | 获取当前登录账号 |
-| `IMClient.init(context, host, port)` | 初始化 SDK（创建 SQLite 数据库、建立 TCP 长连接、恢复增量同步游标） |
-| `IMClient.release()` | 断开长连接、清除缓存、释放协程与网络资源（退出登录或切换账号时调用） |
-| `IMClient.userInfoProvider` | 获取/设置 `IMUserInfoProvider`（头像与昵称数据源） |
-| `IMClient.connectionState` | `StateFlow<ConnectionState>` 实时监听网络连接状态（`Connected`, `Connecting`, `Reconnecting`, `Disconnected`, `Failed`） |
+### MessageBuilder
 
-### 2. 消息操作与响应式监听 (`IMClient`)
+当前快捷构造函数包括：
 
-| API 方法 | 作用说明 |
-|:---|:---|
-| `IMClient.incomingMessages` | `SharedFlow<Message>` 实时监听接收到的新消息 |
-| `IMClient.messageUpdates` | `SharedFlow<Message>` 实时监听消息状态变更（`SENDING` / `SUCCESS` / `FAIL`） |
-| `IMClient.sendMessage(message)` | 发送消息（自动入库、状态置为 `SENDING`，通过 TCP 发送并等待 ACK，超时自动标记失败） |
-| `IMClient.saveMessage(message)` | 保存/更新单条消息到本地 SQLite（不触发网络发送） |
-| `IMClient.saveMessages(messages)` | 批量保存消息到本地 SQLite |
-| `IMClient.getMessageById(messageId)` | 根据消息 ID 查询单条消息实体 |
-| `IMClient.getMessagePage(sessionId, page)` | 分页查询指定会话的历史消息记录 |
-| `IMClient.observeMessages(sessionId)` | `Flow<List<Message>>` 响应式监听指定会话的消息列表（用于聊天页自动刷新） |
-| `IMClient.observeP2PMessages(peerId)` | `Flow<List<Message>>` 响应式监听与指定用户的点对点消息 Flow |
-| `IMClient.observeLastMessage(sessionId)` | `Flow<Message>` 响应式监听指定会话的最新一条消息 |
+- `createTextMessage(...)`
+- `createImageMessage(...)`
+- `createVideoMessage(...)`
+- `createFileMessage(...)`
+- `createRedPacketMessage(...)`
+- `createCardMessage(...)`
+- `createLocationMessage(...)`
+- `createTipMessage(...)`
+- `createForwardedMessage(...)`
 
-### 3. 会话与未读数统计 (`IMClient`)
+通话记录不由客户端构造；服务端在通话结束时生成 `MsgType.CALL`，用 `callId` 保证一次通话只有一条记录。
 
-| API 方法 | 作用说明 |
-|:---|:---|
-| `IMClient.getConversations()` | 异步获取当前账号的所有会话列表 |
-| `IMClient.getP2PConversation(peerId)` | 异步获取与指定用户的 P2P 会话实体 |
-| `IMClient.observeConversations()` | `Flow<List<Conversation>>` 响应式监听会话列表（按时间降序实时更新） |
-| `IMClient.observeTotalUnreadCount()` | `Flow<Int>` 响应式监听全局总未读数（用于 App 底部 Tab 栏红点角标） |
-| `IMClient.addUnreadCountListener(listener)` | Java 友好的未读数监听器，返回 `UnreadCountSubscription`（可调用 `cancel()` 取消） |
-| `IMClient.markConversationRead(sessionId)` | 标记某个会话的消息为已读，清除未读角标 |
-| `IMClient.getUserInfo(account)` | 综合查询用户信息（内存缓存 → SQLite 本地库 → `userInfoProvider` 远程拉取） |
+## 引用、撤回和通话记录规则
 
-### 4. 快捷消息工厂 (`MessageBuilder`)
+| 消息类型 | 转发 | 引用 | 撤回 | 本地删除 |
+|---|---:|---:|---:|---:|
+| 普通文本/媒体 | 支持（取决于附件） | 支持 | 发送后两分钟内 | 支持 |
+| 提示消息 | 按业务配置 | 按业务配置 | 通常不支持 | 支持 |
+| 通话记录 `CALL` | 不支持 | 不支持 | 不支持 | 支持 |
 
-`MessageBuilder` 提供便捷的方法构造各类标准消息实体：
-- `MessageBuilder.createTextMessage(sessionId, sessionType, msg = "你好", receiverId = ...)`
-- `MessageBuilder.createImageMessage(sessionId, sessionType, localPath = "...", mWidth = 1080, mHeight = 1920, size = 102400, mimeType = "image/jpeg")`
-- `MessageBuilder.createVideoMessage(sessionId, sessionType, receiverId, attachment)`
-- `MessageBuilder.createRedPacketMessage(sessionId, sessionType, receiverId, attachment)`
-- `MessageBuilder.createTipMessage(sessionId, sessionType, receiverId, msg = "提示文本")`
+引用信息保存在消息 `extra.quote` 中；撤回由服务端校验发送者、时间窗口和消息状态，并通过实时推送与增量同步保证双方一致。
 
-### 5. 多媒体异步发送 (`IMMediaMessageSender`)
+## 自定义消息类型
 
-- `IMMediaMessageSender.send(message)`: 协程挂起上传多媒体附件并调用 `IMClient.sendMessage`
-- `IMMediaMessageSender.enqueue(message)`: 推入后台全局队列执行上传并发送（页面销毁不受影响）
-- `IMMediaMessageSender.isMedia(message)`: 判断消息是否为图片/视频/语音等多媒体类型
+### 1. 定义 Attachment
 
----
-
-## 🎨 扩展自定义业务消息气泡 (SPI 机制)
-
-如果需要扩展例如“商品卡片”、“优惠券”等自定义消息类型，SDK 提供了基于 Java SPI 与气泡工厂的完全解耦扩展方案：
-
-### 第 1 步：定义自定义 Attachment 实体
-实现 `MsgAttachment` 接口，必须提供带有 `json: String` 入参的构造函数供底层反序列化调用：
+附件必须实现 `MsgAttachment`，并提供可由反射调用的字符串构造函数：
 
 ```kotlin
-data class GoodsAttachment(
-    var goodsId: String = "",
-    var goodsName: String = "",
-    var price: String = "",
-    var imageUrl: String = ""
-) : MsgAttachment {
+class GoodsAttachment(json: String? = null) : MsgAttachment {
+    var goodsId = ""
+    var title = ""
 
-    constructor(json: String) : this() {
-        runCatching {
-            val obj = org.json.JSONObject(json)
-            goodsId = obj.optString("goodsId")
-            goodsName = obj.optString("goodsName")
-            price = obj.optString("price")
-            imageUrl = obj.optString("imageUrl")
+    init {
+        if (!json.isNullOrBlank()) JSONObject(json).also {
+            goodsId = it.optString("goodsId")
+            title = it.optString("title")
         }
     }
 
-    override fun toJson(send: Boolean): String = org.json.JSONObject().apply {
-        put("goodsId", goodsId)
-        put("goodsName", goodsName)
-        put("price", price)
-        put("imageUrl", imageUrl)
-    }.toString()
+    override fun getMsgType(): Int = 1001
 
-    override fun getMsgType(): Int = 1001 // 自定义消息 Type (> 1000)
+    override fun toJson(send: Boolean): String = JSONObject()
+        .put("goodsId", goodsId)
+        .put("title", title)
+        .toString()
 }
 ```
 
-### 第 2 步：配置 SPI 服务发现（必须）
-为了让 `imcore` 内核在收到消息或从数据库读取时能够自动将 JSON 反序列化为 `GoodsAttachment`，需要在你的模块 `src/main/resources/META-INF/services/` 目录下创建或编辑文件：
+### 2. 注册 SPI
 
-**文件路径**：`src/main/resources/META-INF/services/com.kora.imcore.attachment.MsgAttachment`  
-**文件内容**（添加你的 Attachment 全类名）：
+创建：
+
 ```text
-com.yourpkg.GoodsAttachment
+src/main/resources/META-INF/services/com.kora.imcore.attachment.MsgAttachment
 ```
 
-> **原理说明**：`imcore` 初始化时会通过 `ServiceLoader.load(MsgAttachment::class.java)` 扫描并注册所有附件解析器，调用 `message.getAttachment()` 时即会自动识别并匹配对应类型。
+写入附件完整类名：
 
-### 第 3 步：编写自定义气泡 ViewHolder
-继承 `MsgViewHolderBase` 实现布局加载与数据绑定：
+```text
+com.example.chat.GoodsAttachment
+```
+
+### 3. 注册气泡
 
 ```kotlin
 class MsgGoodsViewHolder(itemView: View) : MsgViewHolderBase(itemView) {
-    override fun getLayout(): Int = R.layout.item_msg_goods_card
+    override fun getLayout(): Int = R.layout.item_msg_goods
 
     override fun bindViewHolder(view: View, message: IMMessage) {
-        val goods = MsgViewHolderFactory.getAttachment(message) as? GoodsAttachment ?: return
-        view.findViewById<TextView>(R.id.tv_goods_name).text = goods.goodsName
-        view.findViewById<TextView>(R.id.tv_goods_price).text = "¥${goods.price}"
-        Glide.with(view).load(goods.imageUrl).into(view.findViewById(R.id.iv_goods_pic))
+        val attachment = message.getAttachment() as? GoodsAttachment ?: return
+        view.findViewById<TextView>(R.id.title).text = attachment.title
     }
 }
+
+MsgViewHolderFactory.register(
+    GoodsAttachment::class.java,
+    MsgGoodsViewHolder::class.java
+)
 ```
 
-### 第 4 步：注册到气泡工厂
-在 Application 或聊天页面初始化时注册映射关系：
+服务端的 `attachment` 和 `extra` 使用通用 JSON 文本存储，新增普通业务附件通常不需要修改数据库表结构。
 
-```kotlin
-MsgViewHolderFactory.register(GoodsAttachment::class.java, MsgGoodsViewHolder::class.java)
-```
-
----
-
-## 🛠️ 本地联调服务端
-
-工程自带了一个用于本地联调的 Node.js TCP 演示服务端：
+## 启动联调服务端
 
 ```bash
-# 进入服务端目录
-cd server
-
-# 启动本地 TCP 消息中继服务 (默认监听 8090 端口)
+cd im-server
+npm install
 npm start
 ```
 
----
+默认端口由 `im-server/config.js` 配置。Android Demo 中的服务器 IP 必须是手机能够访问的局域网地址，不能在真机上使用 `127.0.0.1` 指向开发电脑。
 
-## 📄 开源许可证
+服务端当前处理：
 
-KoraIM 基于 **[Apache License 2.0](LICENSE)** 协议开源。欢迎提交 Issue 与 Pull Request！
+- 登录和在线连接路由
+- 消息 ACK 与消息持久化
+- 在线推送和离线增量同步
+- `sync_ack` 游标确认
+- 消息撤回校验与广播
+- `call_signal` 通话信令、忙线和断线结束
+- 服务端通话记录生成与双方同步
+
+## 测试建议
+
+至少使用两个账号、两台设备或模拟器测试：
+
+1. 在线文本与媒体消息。
+2. 接收方离线后发送消息，再上线验证增量同步。
+3. 撤回成功、超时撤回失败和双方 UI 更新。
+4. 引用发送、点击定位和被引用消息撤回。
+5. 语音/视频接听、拒绝、取消、挂断、忙线和无人接听。
+6. 通话记录方向、双方文案、时长及离线同步。
+7. 未读总数、进入聊天清零和 `99+` 角标。
+
+## License
+
+KoraIM 使用 [Apache License 2.0](LICENSE)。
 
 Copyright 2026 GodCodeApps
