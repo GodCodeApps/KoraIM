@@ -10,12 +10,13 @@ class ImAppDatabaseHelper(context: Context, account: String) :
 
     companion object {
         private const val DATABASE_PREFIX = "im_app_database_"
-        const val DATABASE_VERSION = 8
+        const val DATABASE_VERSION = 9
 
         const val TABLE_MESSAGE = "message"
         const val TABLE_USER_INFO = "user_info"
         const val TABLE_CONVERSATION = "conversation"
         const val TABLE_SYNC_STATE = "sync_state"
+        const val TABLE_MESSAGE_LOCAL_STATE = "message_local_state"
         
         // Table columns
         const val COLUMN_ID = "id"
@@ -105,6 +106,7 @@ class ImAppDatabaseHelper(context: Context, account: String) :
                 updateTime INTEGER NOT NULL
             )""".trimIndent()
         )
+        createMessageLocalStateTable(db)
         createIndexes(db)
     }
 
@@ -114,6 +116,24 @@ class ImAppDatabaseHelper(context: Context, account: String) :
                 db.execSQL("ALTER TABLE $TABLE_CONVERSATION ADD COLUMN lastMessageStatus INTEGER NOT NULL DEFAULT 0")
             }
         }
+        if (oldVersion < 9) createMessageLocalStateTable(db)
+    }
+
+    private fun createMessageLocalStateTable(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS $TABLE_MESSAGE_LOCAL_STATE (
+                ownerId TEXT NOT NULL,
+                messageId TEXT NOT NULL,
+                sessionId TEXT NOT NULL,
+                deleted INTEGER NOT NULL DEFAULT 0,
+                deletedAt INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(ownerId, messageId)
+            )""".trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_message_local_state_session " +
+                "ON $TABLE_MESSAGE_LOCAL_STATE(ownerId, sessionId, deleted)"
+        )
     }
 
     private fun createIndexes(db: SQLiteDatabase) {

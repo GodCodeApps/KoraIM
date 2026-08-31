@@ -53,6 +53,9 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
         view.findViewById<ImageView>(R.id.iv_back)?.setOnClickListener {
             activity?.onBackPressed()
         }
+        view.findViewById<ImageView>(R.id.iv_more_info)?.setOnClickListener {
+            showMessageRecoveryDialog()
+        }
         var originalTitle = peerId.ifBlank { sessionId }
         val tvTitle = view.findViewById<TextView>(R.id.tv_title)
         tvTitle?.text = originalTitle
@@ -182,6 +185,40 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
     fun quoteMessage(message: IMMessage) {
         if (message.getMsgType() == com.kora.imcore.constant.MsgType.CALL) return
         inputPanel?.quoteMessage(message)
+    }
+
+    private fun showMessageRecoveryDialog() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            if (currentSessionId.isBlank() && peerId.isNotBlank()) {
+                currentSessionId = IMClient.getP2PConversation(peerId)?.sessionId.orEmpty()
+                if (currentSessionId.isNotBlank()) inputPanel?.updateSessionId(currentSessionId)
+            }
+            if (currentSessionId.isBlank()) {
+                android.widget.Toast.makeText(requireContext(), "当前会话没有可恢复的消息", android.widget.Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val recoverySessionId = currentSessionId
+            val count = IMClient.getDeletedMessageCount(recoverySessionId)
+            if (count <= 0) {
+                android.widget.Toast.makeText(requireContext(), "当前会话没有可恢复的消息", android.widget.Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle("恢复消息")
+                .setMessage("当前会话有 $count 条手动删除的消息，是否全部恢复？")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("恢复") { _, _ ->
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        val restored = IMClient.restoreDeletedMessages(recoverySessionId)
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            if (restored > 0) "已恢复 $restored 条消息" else "没有可恢复的消息",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                .show()
+        }
     }
 
     override fun onResume() {

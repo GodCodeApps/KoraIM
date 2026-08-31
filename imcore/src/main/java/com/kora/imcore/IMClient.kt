@@ -282,6 +282,18 @@ object IMClient {
         return userRepository.get(account)
     }
 
+    /** 获取当前账号在指定会话中可恢复的本地删除消息数量。 */
+    suspend fun getDeletedMessageCount(sessionId: String): Int {
+        ensureInitialized()
+        return if (sessionId.isBlank()) 0 else messageRepository.getDeletedCount(sessionId, IMRuntime.ownerId)
+    }
+
+    /** 恢复当前账号在指定会话中手动删除的消息，不改变未读数。 */
+    suspend fun restoreDeletedMessages(sessionId: String): Int {
+        ensureInitialized()
+        return if (sessionId.isBlank()) 0 else messageRepository.restoreDeleted(sessionId, IMRuntime.ownerId)
+    }
+
     fun sendCallSignal(signal: CallSignal): Boolean {
         ensureInitialized()
         if (signal.receiverId.isBlank() || signal.callId.isBlank()) return false

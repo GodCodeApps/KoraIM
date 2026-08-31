@@ -54,6 +54,15 @@ class MessageDao(
         _tableChangeFlow.tryEmit(Unit)
     }
 
+    private fun visibleMessageClause(alias: String = ImAppDatabaseHelper.TABLE_MESSAGE): String =
+        "NOT EXISTS (SELECT 1 FROM ${ImAppDatabaseHelper.TABLE_MESSAGE_LOCAL_STATE} local " +
+            "WHERE local.messageId = $alias.${ImAppDatabaseHelper.COLUMN_MESSAGE_ID} AND local.deleted = 1)"
+
+    private fun isLocallyDeleted(db: SQLiteDatabase, messageId: String): Boolean = db.rawQuery(
+        "SELECT 1 FROM ${ImAppDatabaseHelper.TABLE_MESSAGE_LOCAL_STATE} WHERE messageId = ? AND deleted = 1",
+        arrayOf(messageId)
+    ).use { it.moveToFirst() }
+
     private fun parseMessageList(cursor: Cursor): List<Message> {
         val list = mutableListOf<Message>()
         if (cursor.moveToFirst()) {
@@ -123,7 +132,7 @@ class MessageDao(
         return _tableChangeFlow.map {
             val db = dbHelper.readableDatabase
             val cursor = db.rawQuery(
-                "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE sessionId = ? ORDER BY id DESC",
+                "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE sessionId = ? AND ${visibleMessageClause()} ORDER BY id DESC",
                 arrayOf(sessionId)
             )
             parseMessageList(cursor)
@@ -132,8 +141,9 @@ class MessageDao(
 
     fun getP2PMessages(ownerId: String, peerId: String): Flow<List<Message>> = _tableChangeFlow.map {
         val cursor = dbHelper.readableDatabase.rawQuery(
-            "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE sessionType = ? AND " +
+            "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} m WHERE sessionType = ? AND " +
                 "((senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?)) " +
+                "AND ${visibleMessageClause("m")} " +
                 "ORDER BY id DESC",
             arrayOf(
                 com.kora.imcore.constant.SessionType.P2P.toString(),
@@ -154,11 +164,13 @@ class MessageDao(
                 messageToContentValues(message),
                 SQLiteDatabase.CONFLICT_REPLACE
             )
-            conversationDao.upsertInTransaction(
-                db,
-                message.toConversation(ownerId),
-                incrementUnread = !existed && message.direct == MsgDirection.IN
-            )
+            if (!isLocallyDeleted(db, message.messageId)) {
+                conversationDao.upsertInTransaction(
+                    db,
+                    message.toConversation(ownerId),
+                    incrementUnread = !existed && message.direct == MsgDirection.IN
+                )
+            }
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
@@ -201,7 +213,9 @@ class MessageDao(
                     messageToContentValues(message),
                     SQLiteDatabase.CONFLICT_IGNORE
                 )
-                conversationDao.upsertInTransaction(db, message.toConversation(ownerId), inserted != -1L && message.direct == MsgDirection.IN)
+                if (!isLocallyDeleted(db, message.messageId)) {
+                    conversationDao.upsertInTransaction(db, message.toConversation(ownerId), inserted != -1L && message.direct == MsgDirection.IN)
+                }
             }
             db.insertWithOnConflict(
                 ImAppDatabaseHelper.TABLE_SYNC_STATE,
@@ -227,7 +241,7 @@ class MessageDao(
         val db = dbHelper.readableDatabase
         val offset = page * 10
         val cursor = db.rawQuery(
-            "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE sessionId = ? ORDER BY id DESC LIMIT 10 OFFSET ?",
+            "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE sessionId = ? AND ${visibleMessageClause()} ORDER BY id DESC LIMIT 10 OFFSET ?",
             arrayOf(sessionId, offset.toString())
         )
         parseMessageList(cursor)
@@ -237,7 +251,7 @@ class MessageDao(
         return _tableChangeFlow.map {
             val db = dbHelper.readableDatabase
             val cursor = db.rawQuery(
-                "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE sessionId = ? ORDER BY id DESC LIMIT 1",
+                "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE sessionId = ? AND ${visibleMessageClause()} ORDER BY id DESC LIMIT 1",
                 arrayOf(sessionId)
             )
             val list = parseMessageList(cursor)
@@ -301,7 +315,7 @@ class MessageDao(
     fun getMessageByMessageId(messageId: String): Message? {
         val db = dbHelper.readableDatabase
         val cursor = db.rawQuery(
-            "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE messageId = ?",
+            "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE messageId = ? AND ${visibleMessageClause()}",
             arrayOf(messageId)
         )
         return parseMessageList(cursor).firstOrNull()
@@ -392,11 +406,20 @@ class MessageDao(
                 }
             }
 
-            db.delete(
-                ImAppDatabaseHelper.TABLE_MESSAGE,
-                "${ImAppDatabaseHelper.COLUMN_MESSAGE_ID} = ?",
-                arrayOf(messageId)
-            )
+            if (!sessionId.isNullOrEmpty()) {
+                db.insertWithOnConflict(
+                    ImAppDatabaseHelper.TABLE_MESSAGE_LOCAL_STATE,
+                    null,
+                    ContentValues().apply {
+                        put("ownerId", ownerId)
+                        put("messageId", messageId)
+                        put("sessionId", sessionId)
+                        put("deleted", 1)
+                        put("deletedAt", System.currentTimeMillis())
+                    },
+                    SQLiteDatabase.CONFLICT_REPLACE
+                )
+            }
 
             if (!sessionId.isNullOrEmpty()) {
                 val isLatestInConversation = db.rawQuery(
@@ -406,7 +429,8 @@ class MessageDao(
 
                 if (isLatestInConversation) {
                     val remainingLatestCursor = db.rawQuery(
-                        "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE ${ImAppDatabaseHelper.COLUMN_SESSION_ID} = ? ORDER BY ${ImAppDatabaseHelper.COLUMN_ID} DESC LIMIT 1",
+                        "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE ${ImAppDatabaseHelper.COLUMN_SESSION_ID} = ? " +
+                            "AND ${visibleMessageClause()} ORDER BY ${ImAppDatabaseHelper.COLUMN_ID} DESC LIMIT 1",
                         arrayOf(sessionId)
                     )
                     val remainingMessages = parseMessageList(remainingLatestCursor)
@@ -443,9 +467,65 @@ class MessageDao(
         notifyChange()
     }
 
+    suspend fun getDeletedMessageCount(sessionId: String, ownerId: String): Int = withContext(Dispatchers.IO) {
+        dbHelper.readableDatabase.rawQuery(
+            "SELECT COUNT(*) FROM ${ImAppDatabaseHelper.TABLE_MESSAGE_LOCAL_STATE} " +
+                "WHERE ownerId = ? AND sessionId = ? AND deleted = 1",
+            arrayOf(ownerId, sessionId)
+        ).use { cursor -> if (cursor.moveToFirst()) cursor.getInt(0) else 0 }
+    }
+
+    suspend fun restoreDeletedMessages(sessionId: String, ownerId: String): Int = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        var restored = 0
+        db.beginTransaction()
+        try {
+            restored = db.delete(
+                ImAppDatabaseHelper.TABLE_MESSAGE_LOCAL_STATE,
+                "ownerId = ? AND sessionId = ? AND deleted = 1",
+                arrayOf(ownerId, sessionId)
+            )
+            if (restored > 0) refreshConversationLatest(db, ownerId, sessionId)
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        if (restored > 0) {
+            conversationDao.notifyChanged()
+            notifyChange()
+        }
+        restored
+    }
+
+    private fun refreshConversationLatest(db: SQLiteDatabase, ownerId: String, sessionId: String) {
+        val latest = parseMessageList(db.rawQuery(
+            "SELECT * FROM ${ImAppDatabaseHelper.TABLE_MESSAGE} WHERE ${ImAppDatabaseHelper.COLUMN_SESSION_ID} = ? " +
+                "AND ${visibleMessageClause()} ORDER BY ${ImAppDatabaseHelper.COLUMN_ID} DESC LIMIT 1",
+            arrayOf(sessionId)
+        )).firstOrNull()
+        if (latest != null) {
+            conversationDao.upsertInTransaction(db, latest.toConversation(ownerId), false, forceUpdate = true)
+        } else {
+            db.update(
+                ImAppDatabaseHelper.TABLE_CONVERSATION,
+                ContentValues().apply {
+                    put("lastMessageId", "")
+                    put("lastMessageType", 0)
+                    put("lastMessageStatus", MsgStatus.SUCCESS)
+                    put("lastMessagePreview", "")
+                    put("lastMessageTime", 0L)
+                    put("updateTime", System.currentTimeMillis())
+                },
+                "ownerId = ? AND sessionId = ?",
+                arrayOf(ownerId, sessionId)
+            )
+        }
+    }
+
     suspend fun deleteAllMessage() = withContext(Dispatchers.IO) {
         val db = dbHelper.writableDatabase
         db.delete(ImAppDatabaseHelper.TABLE_MESSAGE, null, null)
+        db.delete(ImAppDatabaseHelper.TABLE_MESSAGE_LOCAL_STATE, null, null)
         notifyChange()
     }
 }

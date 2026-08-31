@@ -251,6 +251,8 @@ lifecycleScope.launch {
 | `observeP2PMessages(peerId)` | 观察与指定用户的 P2P 消息 |
 | `observeLastMessage(sessionId)` | 观察会话最新消息 |
 | `deleteMessage(messageId)` | 仅删除当前账号的本地记录 |
+| `getDeletedMessageCount(sessionId)` | 查询当前会话可恢复的手动删除消息数量 |
+| `restoreDeletedMessages(sessionId)` | 恢复当前会话全部手动删除消息且不增加未读数 |
 | `recallMessage(messageId)` | 请求服务端撤回，返回 `RecallResult` |
 
 撤回规则：只有当前账号发送、已成功、未撤回且发送时间不超过两分钟的消息可撤回。`MsgType.CALL` 通话记录不能撤回。

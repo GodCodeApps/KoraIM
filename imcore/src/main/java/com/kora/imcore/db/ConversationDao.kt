@@ -99,6 +99,11 @@ class ConversationDao(private val dbHelper: ImAppDatabaseHelper) {
                 "sessionId = ?",
                 arrayOf(sessionId)
             )
+            db.delete(
+                ImAppDatabaseHelper.TABLE_MESSAGE_LOCAL_STATE,
+                "ownerId = ? AND sessionId = ?",
+                arrayOf(ownerId, sessionId)
+            )
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
