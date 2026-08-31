@@ -82,9 +82,15 @@ class CallActivity : AppCompatActivity() {
 
     private fun render(session: CallSession?) {
         if (session == null) { finish(); return }
-        findViewById<TextView>(com.kora.imcall.R.id.imcall_peer).text = session.peerId
-        findViewById<TextView>(com.kora.imcall.R.id.imcall_avatar).text = session.peerId.take(1).uppercase()
-        loadPeerProfile(session)
+        if (loadedProfileCallId != session.callId) {
+            findViewById<TextView>(com.kora.imcall.R.id.imcall_peer).text = session.peerId
+            findViewById<TextView>(com.kora.imcall.R.id.imcall_avatar).text = session.peerId.take(1).uppercase()
+            findViewById<ImageView>(com.kora.imcall.R.id.imcall_avatar_image).apply {
+                Glide.with(this@CallActivity).clear(this)
+                visibility = View.GONE
+            }
+            loadPeerProfile(session)
+        }
         val incoming = session.phase == CallPhase.INCOMING
         findViewById<View>(com.kora.imcall.R.id.imcall_accept_group).visibility = if (incoming) View.VISIBLE else View.GONE
         findViewById<TextView>(com.kora.imcall.R.id.imcall_end_label).text = if (incoming) "拒绝" else "挂断"
