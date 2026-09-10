@@ -35,11 +35,15 @@ internal object IMEventHub {
     private val _typingEvents = MutableSharedFlow<String>(extraBufferCapacity = 16, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     private val _callSignals = MutableSharedFlow<CallSignal>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
+    /** 被挤下线事件流（携带 reason，缓冲 8 条，满时丢弃最旧的） */
+    private val _kickEvents = MutableSharedFlow<String>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
     val incomingMessages = _incomingMessages.asSharedFlow()
     val messageUpdates = _messageUpdates.asSharedFlow()
     val connectionState = _connectionState.asStateFlow()
     val typingEvents = _typingEvents.asSharedFlow()
     val callSignals = _callSignals.asSharedFlow()
+    val kickEvents = _kickEvents.asSharedFlow()
 
     /** 发射新消息事件（由 [IMRuntime.incoming] 调用） */
     fun emitIncoming(message: Message) { _incomingMessages.tryEmit(message) }
@@ -50,6 +54,12 @@ internal object IMEventHub {
     /** 发射正在输入事件（由 [ChatClientHandler] 调用） */
     fun emitTyping(senderId: String) { _typingEvents.tryEmit(senderId) }
     fun emitCallSignal(signal: CallSignal) { _callSignals.tryEmit(signal) }
+
+    /** 发射被挤下线事件（由 [ChatClientHandler] 调用） */
+    fun emitKick(reason: String) {
+        _kickEvents.tryEmit(reason)
+        com.kora.imcore.IMClient.notifyKicked(reason)
+    }
 
     /** 更新连接状态（由 [IMService] 和 [ImServiceProxy] 调用） */
     fun setConnectionState(state: ConnectionState) { _connectionState.value = state }

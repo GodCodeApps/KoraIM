@@ -70,6 +70,44 @@ async function handleFrame(socket, line) {
             if (!account) throw new Error('Account is required');
             socket.account = account;
             const accountSockets = clients.get(account) || new Set();
+
+            // 踢掉该账号已有的所有旧连接（单端登录互踢）
+            for (const oldSocket of accountSockets) {
+                if (oldSocket !== socket && !oldSocket.destroyed) {
+                    console.log(`[!] Kicking existing session for ${account}`);
+                    writeFrame(oldSocket, {
+                        type: 'kick',
+                        reason: 'logged_in_elsewhere',
+                        errorMessage: '您的账号已在其他设备登录'
+                    });
+                    oldSocket.destroy();
+                }
+            }
+
+            // 如果该账号正在通话中，中断并释放通话
+            if (userCalls.has(account)) {
+                const callId = userCalls.get(account);
+                const call = callId ? activeCalls.get(callId) : null;
+                if (call) {
+                    const peerId = call.caller === account ? call.callee : call.caller;
+                    clients.get(peerId)?.forEach(client => writeFrame(client, {
+                        type: 'call_signal',
+                        callSignal: {
+                            callId,
+                            action: 'hangup',
+                            senderId: account,
+                            receiverId: peerId,
+                            callType: '',
+                            payload: JSON.stringify({ reason: 'kicked' }),
+                            timestamp: Date.now()
+                        }
+                    }));
+                    await persistCallRecord(callId, call, 'disconnected', account);
+                    releaseCall(callId);
+                }
+            }
+
+            accountSockets.clear();
             accountSockets.add(socket);
             clients.set(account, accountSockets);
             console.log(`[=] ${account} logged in`);

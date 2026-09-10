@@ -49,6 +49,7 @@ internal data class WireEnvelope(
     val requestId: String? = null,
     val errorCode: String? = null,
     val errorMessage: String? = null,
+    val reason: String? = null,
     val callSignal: CallSignal? = null
 ) {
     /** 序列化为 JSON 并追加换行符（NDJSON 格式） */
@@ -67,6 +68,7 @@ internal data class WireEnvelope(
         const val TYPE_RECALL = "recall"
         const val TYPE_RECALL_ACK = "recall_ack"
         const val TYPE_CALL_SIGNAL = "call_signal"
+        const val TYPE_KICK = "kick"
 
         /** 构建消息帧 */
         fun message(message: Message) = WireEnvelope(TYPE_MESSAGE, message.messageId, message)

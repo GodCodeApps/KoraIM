@@ -1,5 +1,6 @@
 package com.kora.im
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -25,6 +26,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         configureMessageActions()
+        observeKickEvents()
         currentAccount = savedInstanceState?.getString(STATE_ACCOUNT)
         if (currentAccount == null) showLogin() else {
             initializeClient(currentAccount!!)
@@ -59,12 +61,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun observeKickEvents() {
+        lifecycleScope.launch {
+            IMClient.kickEvents.collect { reason ->
+                Toast.makeText(applicationContext, reason.ifBlank { "您的账号已在其他设备登录" }, Toast.LENGTH_LONG).show()
+                // 若用户当前在子页面（例如 ChatActivity、CallActivity），将其清掉并把 MainActivity 拉到前台
+                val intent = Intent(this@MainActivity, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                startActivity(intent)
+                showLogin()
+            }
+        }
+    }
+
     fun showLogin() {
         currentAccount = null
         IMClient.release()
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, LoginFragment())
-            .commit()
+            .commitAllowingStateLoss()
     }
 
     private fun configureMessageActions() {
@@ -100,7 +116,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         // Development machine's WLAN address. The phone and computer must be on
         // the same LAN; update this value if the computer's DHCP address changes.
-        private const val SERVER_HOST = "192.168.1.48"
+        private const val SERVER_HOST = "192.168.31.164"
         private const val SERVER_PORT = 8090
         private const val STATE_ACCOUNT = "current_account"
     }

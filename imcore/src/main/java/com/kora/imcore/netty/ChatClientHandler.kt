@@ -36,6 +36,9 @@ internal class ChatClientHandler(
     /** 连续未收到 pong 响应的次数，每次收到任何服务端数据都会归零 */
     private var missedPongs = 0
 
+    /** 是否被服务端踢下线，如果为 true 则不触发自动重连 */
+    private var isKicked = false
+
     override fun channelRead0(ctx: ChannelHandlerContext, frame: String) {
         try {
             val envelope = gson.fromJson(frame, WireEnvelope::class.java)
@@ -92,6 +95,13 @@ internal class ChatClientHandler(
                     }
                 }
                 WireEnvelope.TYPE_CALL_SIGNAL -> envelope.callSignal?.let(IMEventHub::emitCallSignal)
+                WireEnvelope.TYPE_KICK -> {
+                    isKicked = true
+                    val reason = envelope.errorMessage ?: envelope.reason ?: "您的账号已在其他设备登录"
+                    Log.w(TAG, "Kicked from server: $reason")
+                    IMEventHub.emitKick(reason)
+                    ctx.close()
+                }
                 else -> Log.w(TAG, "Ignoring unknown frame type: ${envelope.type}")
             }
         } catch (error: Exception) {
@@ -142,14 +152,19 @@ internal class ChatClientHandler(
         super.channelActive(ctx)
     }
 
-    /** 连接断开时通知 IMService 触发重连 */
+    /** 连接断开时通知 IMService 触发重连（若被踢则不重连） */
     override fun channelInactive(ctx: ChannelHandlerContext) {
-        Log.w(TAG, "Connection inactive")
-        onDisconnected()
+        Log.w(TAG, "Connection inactive, isKicked=$isKicked")
+        if (!isKicked) {
+            onDisconnected()
+        } else {
+            IMEventHub.setConnectionState(ConnectionState.Disconnected)
+        }
     }
 
     /** 连接异常时先通知 UI 层，再关闭连接（关闭后会触发 channelInactive → 重连） */
     override fun exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) {
+        if (isKicked) return
         Log.e(TAG, "Connection error", cause)
         IMEventHub.setConnectionState(ConnectionState.Failed(cause.message ?: "Connection error"))
         ctx.close()

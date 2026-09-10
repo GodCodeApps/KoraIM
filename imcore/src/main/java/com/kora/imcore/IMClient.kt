@@ -28,6 +28,11 @@ import kotlinx.coroutines.Dispatchers
 import com.kora.imcore.listener.UnreadCountListener
 import com.kora.imcore.constant.MsgType
 import com.kora.imcore.listener.UnreadCountSubscription
+import com.kora.imcore.listener.KickListener
+import com.kora.imcore.listener.KickSubscription
+import android.os.Handler
+import android.os.Looper
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import com.kora.imcore.call.CallSignal
@@ -76,6 +81,49 @@ object IMClient {
     /** 对方正在输入事件流（携带 senderId），UI 层可收集此流展示“对方正在输入...” */
     val typingEvents: SharedFlow<String> get() = IMEventHub.typingEvents
     val callSignals: SharedFlow<CallSignal> get() = IMEventHub.callSignals
+
+    /** 被挤下线事件流（携带 reason），UI 层收集此流展示被踢弹窗并退回登录界面 */
+    val kickEvents: SharedFlow<String> get() = IMEventHub.kickEvents
+
+    private val kickListeners = CopyOnWriteArrayList<KickListener>()
+    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+
+    /**
+     * Java 友好的被踢下线监听器注册接口。
+     * 回调保证在 Android 主线程执行，Java 端可直接传入 Lambda，无需处理协程或 Flow。
+     *
+     * Java 调用示例：
+     * ```java
+     * KickSubscription sub = IMClient.addKickListener(reason -> {
+     *     Toast.makeText(context, reason, Toast.LENGTH_SHORT).show();
+     *     showLogin();
+     * });
+     * // 页面注销或退出时取消监听：
+     * sub.cancel();
+     * ```
+     */
+    @JvmStatic
+    fun addKickListener(listener: KickListener): KickSubscription {
+        kickListeners.add(listener)
+        return KickSubscription { kickListeners.remove(listener) }
+    }
+
+    /**
+     * 移除指定的被踢下线监听器。
+     */
+    @JvmStatic
+    fun removeKickListener(listener: KickListener) {
+        kickListeners.remove(listener)
+    }
+
+    internal fun notifyKicked(reason: String) {
+        if (kickListeners.isEmpty()) return
+        mainHandler.post {
+            for (listener in kickListeners) {
+                listener.onKicked(reason)
+            }
+        }
+    }
 
     private var connectionManager: ConnectionManager? = null
     private var databaseHelper: ImAppDatabaseHelper? = null
