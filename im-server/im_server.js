@@ -1,5 +1,7 @@
 // Copyright 2026 GodCodeApps. Licensed under the Apache License, Version 2.0.
 const net = require('net');
+const tls = require('tls');
+const fs = require('fs');
 const crypto = require('crypto');
 const config = require('./config');
 const { createStorage } = require('./storage');
@@ -312,7 +314,7 @@ async function startServer() {
     await storage.init();
 
     // 2. 创建 TCP 服务
-    const server = net.createServer((socket) => {
+    const onClientConnected = (socket) => {
         console.log(`[+] Client connected: ${socket.remoteAddress}:${socket.remotePort}`);
         socket.setEncoding('utf8');
         let buffer = '';
@@ -323,19 +325,42 @@ async function startServer() {
             while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
                 const line = buffer.slice(0, newlineIndex).trim();
                 buffer = buffer.slice(newlineIndex + 1);
-                if (line) handleFrame(socket, line);
+                if (line) {
+                    if (config.wireLogEnabled) {
+                        console.log(`[Wire][PLAINTEXT] ${line.slice(0, 4096)}`);
+                    }
+                    handleFrame(socket, line);
+                }
             }
         });
 
         socket.on('end', () => removeClient(socket));
         socket.on('close', () => removeClient(socket));
         socket.on('error', (error) => console.error(`[x] Socket error: ${error.message}`));
-    });
+    };
+
+    let server;
+    if (config.tlsEnabled) {
+        if (!fs.existsSync(config.tls.certFile) || !fs.existsSync(config.tls.keyFile)) {
+            throw new Error(
+                `TLS is enabled but certificate files are missing. ` +
+                `Expected cert=${config.tls.certFile}, key=${config.tls.keyFile}`
+            );
+        }
+        server = tls.createServer({
+            cert: fs.readFileSync(config.tls.certFile),
+            key: fs.readFileSync(config.tls.keyFile),
+            minVersion: config.tls.minVersion
+        }, onClientConnected);
+    } else {
+        server = net.createServer(onClientConnected);
+    }
 
     server.on('error', (error) => console.error(`[x] Server error: ${error.message}`));
 
     server.listen(PORT, () => {
-        console.log(`KoraIM Server running on port ${PORT} [Storage Engine: ${config.dbType.toUpperCase()}]`);
+        const transport = config.tlsEnabled ? `TLS (${config.tls.minVersion}+)` : 'PLAINTEXT';
+        console.log(`KoraIM Server running on port ${PORT} [Transport: ${transport}] [WireLog: ${config.wireLogEnabled}] [Storage Engine: ${config.dbType.toUpperCase()}]`);
     });
 
     const shutdown = async () => {

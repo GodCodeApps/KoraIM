@@ -1,7 +1,10 @@
 package com.kora.imcore.netty
 
+import android.content.Context
+import com.kora.imcore.R
 import io.netty.channel.ChannelInitializer
 import io.netty.channel.socket.SocketChannel
+import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.codec.string.StringDecoder
 import io.netty.handler.codec.string.StringEncoder
 import io.netty.handler.codec.LineBasedFrameDecoder
@@ -25,7 +28,10 @@ import java.util.concurrent.TimeUnit
  * @param onDisconnected 连接断开时的回调，传递给 [ChatClientHandler]
  */
 class ChatClientInitializer(
-    private val onDisconnected: () -> Unit
+    private val context: Context,
+    private val onDisconnected: () -> Unit,
+    private val tlsEnabled: Boolean,
+    private val wireLogEnabled: Boolean
 ) : ChannelInitializer<SocketChannel>() {
 
     /** 读空闲超时（秒），超过此时间没收到任何数据则触发 READER_IDLE 事件 */
@@ -38,6 +44,22 @@ class ChatClientInitializer(
 
     override fun initChannel(ch: SocketChannel?) {
         ch?.pipeline()?.apply {
+            if (wireLogEnabled) {
+                addLast("wireTransportLog", WireLoggingHandler(if (tlsEnabled) "TLS-CIPHER" else "RAW-WIRE"))
+            }
+            if (tlsEnabled) {
+                val sslContext = context.resources.openRawResource(R.raw.kora_im_dev_cert).use { certificate ->
+                    SslContextBuilder.forClient().trustManager(certificate).build()
+                }
+                // The bundled certificate is a development certificate. Trust is pinned to it,
+                // so the test server can be moved to another LAN IP without hostname changes.
+                addLast("ssl", sslContext.newHandler(ch.alloc()))
+                if (wireLogEnabled) {
+                    addLast("wirePlaintextLog", WireLoggingHandler("TLS-PLAINTEXT"))
+                }
+            } else if (wireLogEnabled) {
+                addLast("wirePlaintextLog", WireLoggingHandler("PLAINTEXT"))
+            }
             // 1. 帧解码器：按换行符分割，单帧最大 1MB
             addLast("frameDecoder", LineBasedFrameDecoder(1024 * 1024))
             // 2. 字符串编解码

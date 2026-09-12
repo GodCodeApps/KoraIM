@@ -25,16 +25,27 @@ internal class ImServiceProxy : ServiceConnection {
     private var port = 0
     private var account = ""
     private var syncCursor = 0L
+    private var tlsEnabled = true
+    private var wireLogEnabled = false
 
     /** 待发送消息缓冲队列（Service 绑定前的消息暂存在此） */
     private val pendingMessages = ConcurrentLinkedQueue<String>()
 
     /** 设置服务器连接参数（在 bindService 之前调用） */
-    fun setServerConfig(host: String, port: Int, account: String, syncCursor: Long) {
+    fun setServerConfig(
+        host: String,
+        port: Int,
+        account: String,
+        syncCursor: Long,
+        tlsEnabled: Boolean,
+        wireLogEnabled: Boolean
+    ) {
         this.host = host
         this.port = port
         this.account = account
         this.syncCursor = syncCursor
+        this.tlsEnabled = tlsEnabled
+        this.wireLogEnabled = wireLogEnabled
     }
 
     /** 发送消息：Service 已就绪则直接发送，否则入队等待 */
@@ -65,7 +76,7 @@ internal class ImServiceProxy : ServiceConnection {
     override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
         service = (binder as? IMService.LocalBinder)?.service
         val connectedService = service ?: return
-        connectedService.connect(host, port, account, syncCursor)
+        connectedService.connect(host, port, account, syncCursor, tlsEnabled, wireLogEnabled)
         // 排空绑定前缓冲的消息
         while (true) connectedService.send(pendingMessages.poll() ?: break)
     }

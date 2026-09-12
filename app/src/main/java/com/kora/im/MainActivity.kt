@@ -48,7 +48,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun initializeClient(account: String) {
         ImSdkImpl.setAccount(account)
-        IMClient.init(applicationContext, SERVER_HOST, SERVER_PORT)
+        IMClient.init(
+            applicationContext,
+            SERVER_HOST,
+            SERVER_PORT,
+            SERVER_TLS_ENABLED,
+            SERVER_WIRE_LOG_ENABLED
+        )
         IMCall.init(applicationContext)
         ImUIKitImpl.setMediaMessageProvider(AppMediaMessageProvider())
         IMNotificationManager.init(this, com.kora.im.chat.ChatActivity::class.java)
@@ -118,6 +124,8 @@ class MainActivity : AppCompatActivity() {
         // the same LAN; update this value if the computer's DHCP address changes.
         private const val SERVER_HOST = "192.168.31.164"
         private const val SERVER_PORT = 8090
+        private const val SERVER_TLS_ENABLED = true
+        private const val SERVER_WIRE_LOG_ENABLED = true
         private const val STATE_ACCOUNT = "current_account"
     }
 }

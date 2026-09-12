@@ -157,8 +157,15 @@ object IMClient {
      * @param context Android 上下文，内部会自动取 applicationContext
      * @param host 服务器地址
      * @param port 服务器端口（1~65535）
+     * @param tlsEnabled 是否启用 TLS 传输加密，默认开启
      */
-    fun init(context: Context, host: String, port: Int) {
+    fun init(
+        context: Context,
+        host: String,
+        port: Int,
+        tlsEnabled: Boolean = true,
+        wireLogEnabled: Boolean = false
+    ) {
         require(host.isNotBlank()) { "host must not be blank" }
         require(port in 1..65535) { "port must be between 1 and 65535" }
         val account = requireNotNull(ImSdkImpl.getAccount()?.takeIf { it.isNotBlank() }) {
@@ -179,7 +186,9 @@ object IMClient {
         IMRuntime.syncCursor = syncCursor
         messageRepository.markStaleOutgoingAsFailed(account)
         ImSdkImpl.init()
-        connectionManager = ConnectionManager(appContext).also { it.connect(host, port, account, syncCursor) }
+        connectionManager = ConnectionManager(appContext).also {
+            it.connect(host, port, account, syncCursor, tlsEnabled, wireLogEnabled)
+        }
     }
 
     /**

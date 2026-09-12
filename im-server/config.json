@@ -1,5 +1,12 @@
 {
   "port": 8090,
+  "tlsEnabled": true,
+  "wireLogEnabled": true,
+  "tls": {
+    "certFile": "./cert/server.crt",
+    "keyFile": "./cert/server.key",
+    "minVersion": "TLSv1.2"
+  },
   "dbType": "sqlite",
   "sqlite": {
     "filename": "./kora_im.db"

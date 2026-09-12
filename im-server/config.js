@@ -12,8 +12,33 @@ if (fs.existsSync(configPath)) {
     }
 }
 
+function parseBoolean(value, fallback) {
+    if (value === undefined || value === null || value === '') return fallback;
+    if (typeof value === 'boolean') return value;
+    return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+}
+
+function resolveFile(value, fallback) {
+    return path.resolve(__dirname, value || fallback);
+}
+
 const config = {
     port: Number(process.env.PORT || fileConfig.port || 8090),
+    // TLS is enabled by default. Set TLS_ENABLED=false only for local/plaintext testing.
+    tlsEnabled: parseBoolean(process.env.TLS_ENABLED, parseBoolean(fileConfig.tlsEnabled, true)),
+    // Test-only wire logging. Disable this outside local debugging because it prints message content.
+    wireLogEnabled: parseBoolean(process.env.WIRE_LOG_ENABLED, parseBoolean(fileConfig.wireLogEnabled, true)),
+    tls: {
+        certFile: resolveFile(
+            process.env.TLS_CERT_FILE || (fileConfig.tls && fileConfig.tls.certFile),
+            './cert/server.crt'
+        ),
+        keyFile: resolveFile(
+            process.env.TLS_KEY_FILE || (fileConfig.tls && fileConfig.tls.keyFile),
+            './cert/server.key'
+        ),
+        minVersion: process.env.TLS_MIN_VERSION || (fileConfig.tls && fileConfig.tls.minVersion) || 'TLSv1.2'
+    },
     dbType: (process.env.DB_TYPE || fileConfig.dbType || 'sqlite').toLowerCase(),
     syncPageSize: Number(process.env.SYNC_PAGE_SIZE || fileConfig.syncPageSize || 100),
     sqlite: {

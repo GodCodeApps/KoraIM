@@ -26,9 +26,16 @@ internal class ConnectionManager(private val context: Context) {
     private var bound = false
 
     /** 绑定 IMService 并建立到服务器的 TCP 连接 */
-    fun connect(host: String, port: Int, account: String, syncCursor: Long) {
+    fun connect(
+        host: String,
+        port: Int,
+        account: String,
+        syncCursor: Long,
+        tlsEnabled: Boolean,
+        wireLogEnabled: Boolean
+    ) {
         disconnect()
-        proxy.setServerConfig(host, port, account, syncCursor)
+        proxy.setServerConfig(host, port, account, syncCursor, tlsEnabled, wireLogEnabled)
         bound = context.bindService(Intent(context, IMService::class.java), proxy, Context.BIND_AUTO_CREATE)
         check(bound) { "Unable to bind KoraIM service" }
     }

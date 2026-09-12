@@ -53,6 +53,13 @@ KoraIM Server running on port 8090 [Storage Engine: SQLITE]
 ```json
 {
   "port": 8090,
+  "tlsEnabled": true,
+  "wireLogEnabled": true,
+  "tls": {
+    "certFile": "./cert/server.crt",
+    "keyFile": "./cert/server.key",
+    "minVersion": "TLSv1.2"
+  },
   "dbType": "sqlite",
   "syncPageSize": 100,
   "sqlite": {
@@ -73,6 +80,8 @@ KoraIM Server running on port 8090 [Storage Engine: SQLITE]
 | 参数字段 | 类型 | 默认值 | 描述 |
 | :--- | :--- | :--- | :--- |
 | `port` | Number | `8090` | TCP 服务端监听端口 |
+| `tlsEnabled` | Boolean | `true` | 是否启用 TLS 传输加密；客户端必须使用相同模式 |
+| `wireLogEnabled` | Boolean | `true` | 是否打印传输调试日志；可能包含消息明文，生产环境建议关闭 |
 | `dbType` | String | `"sqlite"` | 数据库存储引擎，支持 `"sqlite"` 或 `"mysql"` |
 | `syncPageSize` | Number | `100` | 客户端断线重连单次增量同步拉取的消息条数上限 |
 | `sqlite.filename` | String | `"./kora_im.db"` | SQLite 本地数据库文件存放路径（自动开启 WAL 模式） |

@@ -23,6 +23,7 @@ import io.netty.channel.Channel
 import io.netty.channel.ChannelOption
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
+import io.netty.handler.ssl.SslHandler
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -59,6 +60,8 @@ class IMService : Service() {
     @Volatile private var channel: Channel? = null
     @Volatile private var host = ""
     @Volatile private var port = 0
+    @Volatile private var tlsEnabled = true
+    @Volatile private var wireLogEnabled = false
     @Volatile private var account = ""
     @Volatile private var syncCursor = 0L
     @Volatile private var reconnectAttempt = 0
@@ -86,9 +89,18 @@ class IMService : Service() {
      * 建立到服务器的连接。
      * 由 [ImServiceProxy.onServiceConnected] 调用，传入服务器配置和同步游标。
      */
-    internal fun connect(host: String, port: Int, account: String, syncCursor: Long) {
+    internal fun connect(
+        host: String,
+        port: Int,
+        account: String,
+        syncCursor: Long,
+        tlsEnabled: Boolean,
+        wireLogEnabled: Boolean
+    ) {
         this.host = host
         this.port = port
+        this.tlsEnabled = tlsEnabled
+        this.wireLogEnabled = wireLogEnabled
         this.account = account
         this.syncCursor = syncCursor
         released = false
@@ -219,20 +231,27 @@ class IMService : Service() {
             .option(ChannelOption.TCP_NODELAY, true)     // 禁用 Nagle 算法，降低消息延迟
             .option(ChannelOption.SO_KEEPALIVE, true)     // 启用 TCP 层 keepalive 作为兜底
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5_000)
-            .handler(ChatClientInitializer(::scheduleReconnect))
+            .handler(ChatClientInitializer(this, ::scheduleReconnect, tlsEnabled, wireLogEnabled))
 
         bootstrap.connect(InetSocketAddress(host, port)).addListener { future ->
             connecting.set(false)
             if (future.isSuccess) {
-                channel = (future as io.netty.channel.ChannelFuture).channel()
-                reconnectAttempt = 0
-                Log.i(TAG, "Connected to $host:$port")
-                IMEventHub.setConnectionState(ConnectionState.Connected(host, port))
+                val connectedChannel = (future as io.netty.channel.ChannelFuture).channel()
+                channel = connectedChannel
+                val sslHandler = connectedChannel.pipeline().get(SslHandler::class.java)
+                if (sslHandler == null) {
+                    onTransportReady(connectedChannel)
+                } else {
+                    sslHandler.handshakeFuture().addListener { handshake ->
+                        if (handshake.isSuccess) {
+                            onTransportReady(connectedChannel)
+                        } else {
+                            Log.w(TAG, "TLS handshake failed", handshake.cause())
+                            connectedChannel.close()
+                        }
+                    }
+                }
                 // 连接成功后：1.登录认证 → 2.拉取离线消息 → 3.发送队列中的消息
-                channel?.writeAndFlush(WireEnvelope.login(account).encode(gson))
-                Log.i("KoraIM_Sync", "request account=$account cursor=${IMRuntime.syncCursor} reason=connected")
-                channel?.writeAndFlush(WireEnvelope.sync(IMRuntime.syncCursor).encode(gson))
-                drainOutgoingMessages()
             } else {
                 Log.w(TAG, "Connection failed", future.cause())
                 IMEventHub.setConnectionState(ConnectionState.Failed(future.cause()?.message ?: "Connection failed"))
@@ -250,6 +269,17 @@ class IMService : Service() {
      * - 最大重试次数：[MAX_RECONNECT_ATTEMPTS] 次后放弃，进入 [ConnectionState.Failed]
      * - 网络感知：无网络时不调度，等 [onNetworkAvailable] 回调
      */
+    private fun onTransportReady(readyChannel: Channel) {
+        if (released || !readyChannel.isActive) return
+        reconnectAttempt = 0
+        Log.i(TAG, "Connected to $host:$port tls=$tlsEnabled")
+        IMEventHub.setConnectionState(ConnectionState.Connected(host, port))
+        readyChannel.writeAndFlush(WireEnvelope.login(account).encode(gson))
+        Log.i("KoraIM_Sync", "request account=$account cursor=${IMRuntime.syncCursor} reason=connected")
+        readyChannel.writeAndFlush(WireEnvelope.sync(IMRuntime.syncCursor).encode(gson))
+        drainOutgoingMessages()
+    }
+
     private fun scheduleReconnect() {
         channel = null
         if (released || eventLoopGroup.isShuttingDown) return

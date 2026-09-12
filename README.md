@@ -6,7 +6,7 @@
 
 KoraIM 是一个模块化的 Android 即时通讯示例工程，包含通信内核、聊天 UI、WebRTC 实时语音/视频通话、Android Demo 和 Node.js 联调服务端。
 
-项目适合用于学习 IM 架构、快速搭建业务原型，以及二次开发自己的聊天 SDK。当前服务端是联调实现，正式上线前仍需补充鉴权、TLS、限流、监控、推送和 TURN 等生产能力。
+项目适合用于学习 IM 架构、快速搭建业务原型，以及二次开发自己的聊天 SDK。当前服务端是联调实现，已支持 TLS 传输加密；正式上线前仍需根据实际环境补充鉴权、限流、监控、推送和 TURN 等生产能力。
 
 ## 效果预览
 
@@ -25,6 +25,7 @@ KoraIM 是一个模块化的 Android 即时通讯示例工程，包含通信内�
 - 文本、Emoji、图片、语音、视频、文件、位置、名片、红包和提示消息
 - 消息发送 ACK、失败状态和重新发送
 - TCP 长连接、心跳、断线重连和网络状态监听
+- TLS 传输加密，默认开启，支持前后端统一切换明文或密文传输
 - SQLite 持久化、会话列表、分页历史消息和响应式数据流
 - 基于游标的增量同步与离线消息补拉
 - 会话未读数、总未读数和底部消息 Tab 的 `99+` 角标
@@ -68,6 +69,52 @@ app ──> imui ──> imcore
 ```
 
 `imcall` 不依赖 `imui`。它通过 `imcore` 获取用户资料和发送通话信令，业务 App 可以独立替换聊天 UI 或通话 UI。
+
+## 传输加密
+
+KoraIM 默认使用 TLS 保护客户端与服务端之间的网络传输：
+
+```text
+A 客户端明文 → TLS 加密 → 服务端 TLS 解密 → 服务端业务处理/数据库明文存储
+服务端业务明文 → TLS 加密 → B 客户端 TLS 解密 → B 客户端数据库明文存储
+```
+
+TLS 只负责传输链路加密，不改变消息业务结构和数据库存储方式。客户端和服务端必须使用相同模式：
+
+```text
+server.tlsEnabled = true  <=>  client.tlsEnabled = true
+server.tlsEnabled = false <=>  client.tlsEnabled = false
+```
+
+服务端配置位于 `im-server/config.json`：
+
+```json
+{
+  "tlsEnabled": true,
+  "wireLogEnabled": true
+}
+```
+
+Android Demo 的开关位于 `app/src/main/java/com/kora/im/MainActivity.kt`：
+
+```kotlin
+private const val SERVER_TLS_ENABLED = true
+private const val SERVER_WIRE_LOG_ENABLED = true
+```
+
+SDK 调用也可以直接传入开关：
+
+```kotlin
+IMClient.init(
+    applicationContext,
+    host = "192.168.1.6",
+    port = 8090,
+    tlsEnabled = true,
+    wireLogEnabled = true
+)
+```
+
+`wireLogEnabled` 仅用于本地调试。开启后，客户端 Logcat 会打印 `TLS-CIPHER`（密文十六进制）和 `TLS-PLAINTEXT`（TLS 解密后的明文），服务端会打印 `[Wire][PLAINTEXT]`。日志可能包含聊天内容，生产环境应关闭该开关。更多证书、环境变量和明文测试说明见 [`docs/tls.md`](docs/tls.md)。
 
 ## 环境与构建
 
@@ -118,7 +165,7 @@ dependencies {
 
 ```kotlin
 ImSdkImpl.setAccount(account)
-IMClient.init(applicationContext, host = "192.168.1.6", port = 8090)
+IMClient.init(applicationContext, host = "192.168.1.6", port = 8090, tlsEnabled = true)
 IMCall.init(applicationContext)
 ```
 
