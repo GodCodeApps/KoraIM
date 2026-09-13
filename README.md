@@ -30,6 +30,7 @@ KoraIM 是一个模块化的 Android 即时通讯示例工程，包含通信内�
 - 基于游标的增量同步与离线消息补拉
 - 会话未读数、总未读数和底部消息 Tab 的 `99+` 角标
 - 正在输入状态
+- 聊天输入框中文实时语音转文字，支持临时结果、停顿连续拼接、实时音量动画和发送后自动停止
 - 消息转发、引用、引用定位
 - 两分钟内撤回、双方同步撤回结果及重新编辑入口
 - 本地删除消息和删除会话
@@ -55,8 +56,9 @@ KoraIM 是一个模块化的 Android 即时通讯示例工程，包含通信内�
 ```text
 KoraIM
 ├── imcore      通信核心：TCP、信令、ACK、重连、增量同步、SQLite、消息与会话 API
-├── imui        聊天 UI：会话列表、消息列表、输入面板、附件、气泡、引用与撤回交互
+├── imui        聊天 UI：会话列表、消息列表、输入面板、附件、气泡、引用与撤回交互；集成实时语音转文字
 ├── imcall      实时通话：WebRTC 音视频、通话状态机和通话 Activity
+├── onnx-sim-asr 本地实时语音转文字：SenseVoice、Silero VAD、AudioRecord 和识别回调
 ├── app         Android 示例：登录、联系人、单聊入口、底部未读角标和模块集成
 └── im-server   Node.js 联调服务：消息持久化、离线同步、撤回和通话信令
 ```
@@ -65,10 +67,77 @@ KoraIM
 
 ```text
 app ──> imui ──> imcore
+             └─> onnx-sim-asr
  └────> imcall ─> imcore
 ```
 
 `imcall` 不依赖 `imui`。它通过 `imcore` 获取用户资料和发送通话信令，业务 App 可以独立替换聊天 UI 或通话 UI。
+
+## 实时语音转文字
+
+KoraIM 在 `onnx-sim-asr` 中封装了本地实时语音转文字能力，并在 `imui` 的
+`ChatInputView` 中提供了输入框内的麦克风按钮。该功能不上传音频到服务端，识别在设备本地完成。
+
+当前处理链路如下：
+
+```text
+点击输入框内麦克风
+        ↓
+AudioRecord 采集 16 kHz 单声道 PCM
+        ↓
+Silero VAD 检测语音片段
+        ↓
+SenseVoice 本地识别（当前固定中文 zh）
+        ↓
+临时结果实时写入 EditText
+        ↓
+停顿片段连续拼接，发送后自动停止
+```
+
+### 当前行为
+
+- 左侧语音按钮仍然是原来的“按住说话”语音消息功能，没有被替换。
+- 输入框右侧新增语音转文字按钮，选中后显示绿色麦克风。
+- 有声音时根据麦克风实时峰值绘制小幅圆形扩散和声波动画，安静时停止扩散。
+- VAD 可能因为短暂停顿拆分一句话，但输入框会直接连续拼接，不额外插入空格。
+- 如果片段边界出现句号且后面还有内容，会转换为逗号；句子内部的其他标点会保留。
+- 点击发送会先停止实时监听、恢复按钮状态，再发送当前输入文字；识别线程的收尾结果不会再次改写已发送内容。
+
+### 初始化与生命周期
+
+建议在应用启动或首个 Activity 创建时预加载模型。模型加载在后台线程执行，初始化成功后才能开始监听：
+
+```kotlin
+OnnxSimAsr.initialize(applicationContext, object : OnnxSimAsrInitializationListener {
+    override fun onInitialized() {
+        // 可以开始使用输入框语音转文字
+    }
+
+    override fun onError(error: Throwable) {
+        // 模型或 native 资源加载失败
+    }
+})
+```
+
+生命周期顺序：
+
+```text
+initialize → startListening → stopListening → release
+```
+
+`IMessageFragment` 销毁时只停止当前页面的监听；`OnnxSimAsr.release()` 应由应用层在退出账号、进程结束或不再使用 ASR 时调用，不要在普通聊天页面切换时释放全局引擎。
+
+### 权限与模型体积
+
+需要在运行时申请：
+
+```text
+android.permission.RECORD_AUDIO
+```
+
+`onnx-sim-asr` 已声明该权限，但 Android 6.0 及以上仍必须由宿主 Activity/Fragment 主动申请。当前模型和 VAD 文件随库打包，SenseVoice 模型约 228 MB，最终 APK 体积会明显增加；正式发布时可根据包体策略改为按 ABI 或独立模型包分发。
+
+更完整的库 API、Kotlin/Java 示例和回调说明见 [`onnx-sim-asr/README.md`](onnx-sim-asr/README.md)。
 
 ## 传输加密
 
@@ -146,6 +215,7 @@ Windows：
 include(":imcore")
 include(":imui")
 include(":imcall")
+include(":onnx-sim-asr")
 ```
 
 业务模块：
@@ -154,6 +224,15 @@ include(":imcall")
 dependencies {
     implementation(project(":imui"))
     implementation(project(":imcall"))
+}
+```
+
+`imui` 会通过 API 依赖暴露 `onnx-sim-asr`，使用聊天输入框时通常不需要重复声明；
+如果业务模块需要直接调用 ASR，也可以添加：
+
+```kotlin
+dependencies {
+    implementation(project(":onnx-sim-asr"))
 }
 ```
 
@@ -467,6 +546,7 @@ npm start
 5. 语音/视频接听、拒绝、取消、挂断、忙线和无人接听。
 6. 通话记录方向、双方文案、时长及离线同步。
 7. 未读总数、进入聊天清零和 `99+` 角标。
+8. 申请录音权限、ASR 初始化、中文实时识别、停顿连续拼接、音量动画和发送后自动停止。
 
 ## License
 

@@ -24,6 +24,7 @@ dependencyResolutionManagement {
         maven { setUrl("https://maven.aliyun.com/repository/public")  }
         maven { setUrl("https://maven.aliyun.com/repository/google")   }
         maven { setUrl("https://maven.aliyun.com/repository/central")   }
+        maven { setUrl("https://jitpack.io") }
         mavenCentral()
     }
 }
@@ -33,3 +34,4 @@ include(":app")
 include(":imcore")
 include(":imui")
 include(":imcall")
+include(":onnx-sim-asr")
