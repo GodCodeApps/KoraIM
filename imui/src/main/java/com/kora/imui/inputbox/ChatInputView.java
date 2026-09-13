@@ -42,6 +42,7 @@ public class ChatInputView extends LinearLayout {
     private static final String KEY_KEYBOARD_HEIGHT = "key_keyboard_height";
 
     private ImageView ivVoice;
+    private SpeechToTextMicView ivSpeechToText;
     private EditText etMessage;
     private TextView btnVoiceRecord;
     private ImageView ivEmoji;
@@ -57,6 +58,7 @@ public class ChatInputView extends LinearLayout {
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isKeyboardShowing = false;
+    private boolean isSpeechToTextRecording = false;
 
     private enum InputMode {
         TEXT, VOICE, EMOJI, MORE, NONE
@@ -67,6 +69,8 @@ public class ChatInputView extends LinearLayout {
     public interface OnInputListener {
         void onSendMessage(String message);
         void onVoiceClick();
+        default void onSpeechToTextClick() {}
+        default void onSpeechToTextStop() {}
         void onMoreOptionClick(String optionName);
         void onEmojiClick(String emojiTag);
         
@@ -102,6 +106,7 @@ public class ChatInputView extends LinearLayout {
         keyboardHeight = sp.getInt(KEY_KEYBOARD_HEIGHT, defaultHeight);
 
         ivVoice = findViewById(R.id.iv_voice);
+        ivSpeechToText = findViewById(R.id.iv_speech_to_text);
         etMessage = findViewById(R.id.et_message);
         btnVoiceRecord = findViewById(R.id.btn_voice_record);
         ivEmoji = findViewById(R.id.iv_emoji);
@@ -152,6 +157,8 @@ public class ChatInputView extends LinearLayout {
         });
 
         btnSend.setOnClickListener(v -> {
+            // 发送识别出来的文字前，先结束实时语音转文字并恢复按钮状态。
+            stopSpeechToTextIfNeeded();
             if (listener != null) {
                 listener.onSendMessage(etMessage.getText().toString());
                 etMessage.setText("");
@@ -159,6 +166,7 @@ public class ChatInputView extends LinearLayout {
         });
 
         ivVoice.setOnClickListener(v -> {
+            stopSpeechToTextIfNeeded();
             if (currentMode == InputMode.VOICE) {
                 switchMode(InputMode.TEXT);
             } else {
@@ -166,7 +174,12 @@ public class ChatInputView extends LinearLayout {
             }
         });
 
+        ivSpeechToText.setOnClickListener(v -> {
+            if (listener != null) listener.onSpeechToTextClick();
+        });
+
         ivMore.setOnClickListener(v -> {
+            stopSpeechToTextIfNeeded();
             if (currentMode == InputMode.MORE) {
                 switchMode(InputMode.TEXT);
             } else {
@@ -175,6 +188,7 @@ public class ChatInputView extends LinearLayout {
         });
 
         ivEmoji.setOnClickListener(v -> {
+            stopSpeechToTextIfNeeded();
             if (currentMode == InputMode.EMOJI) {
                 switchMode(InputMode.TEXT);
             } else {
@@ -240,11 +254,12 @@ public class ChatInputView extends LinearLayout {
         mainHandler.removeCallbacksAndMessages(null);
 
         // 重置按钮图标
-        ivVoice.setImageResource(R.drawable.ic_voice);
+        ivVoice.setImageResource(R.drawable.ic_chat_voice_toggle);
         ivEmoji.setImageResource(R.drawable.ic_emoji);
         
         switch (newMode) {
             case TEXT:
+                ivSpeechToText.setVisibility(VISIBLE);
                 btnVoiceRecord.setVisibility(GONE);
                 etMessage.setVisibility(VISIBLE);
                 updateSendButtonState();
@@ -253,6 +268,7 @@ public class ChatInputView extends LinearLayout {
                 break;
                 
             case VOICE:
+                ivSpeechToText.setVisibility(GONE);
                 ivVoice.setImageResource(R.drawable.ic_keyboard);
                 etMessage.setVisibility(GONE);
                 btnVoiceRecord.setVisibility(VISIBLE);
@@ -263,6 +279,7 @@ public class ChatInputView extends LinearLayout {
                 break;
                 
             case EMOJI:
+                ivSpeechToText.setVisibility(VISIBLE);
                 ivEmoji.setImageResource(R.drawable.ic_keyboard);
                 btnVoiceRecord.setVisibility(GONE);
                 etMessage.setVisibility(VISIBLE);
@@ -283,6 +300,7 @@ public class ChatInputView extends LinearLayout {
                 break;
                 
             case MORE:
+                ivSpeechToText.setVisibility(VISIBLE);
                 btnVoiceRecord.setVisibility(GONE);
                 etMessage.setVisibility(VISIBLE);
                 updateSendButtonState();
@@ -353,7 +371,7 @@ public class ChatInputView extends LinearLayout {
                 }
                 if (currentMode != InputMode.TEXT && currentMode != InputMode.NONE) {
                     currentMode = InputMode.TEXT;
-                    ivVoice.setImageResource(R.drawable.ic_voice);
+                    ivVoice.setImageResource(R.drawable.ic_chat_voice_toggle);
                     ivEmoji.setImageResource(R.drawable.ic_emoji);
                 }
             } else {
@@ -409,6 +427,57 @@ public class ChatInputView extends LinearLayout {
         showKeyboard();
     }
 
+    /** Returns the current plain text in the chat editor. */
+    public String getInputText() {
+        return etMessage.getText().toString();
+    }
+
+    /**
+     * Updates the editor from ASR without opening the keyboard or changing
+     * the current input panel mode.
+     */
+    public void setSpeechInputText(String text) {
+        etMessage.setText(text == null ? "" : text);
+        etMessage.setSelection(etMessage.length());
+        updateSendButtonState();
+    }
+
+    /** Update the microphone icon and editor state while ASR is active. */
+    public void setSpeechToTextRecording(boolean recording) {
+        isSpeechToTextRecording = recording;
+        if (recording) {
+            ivSpeechToText.setVisibility(VISIBLE);
+            ivSpeechToText.setRecording(true);
+            ivSpeechToText.setContentDescription("停止语音转文字");
+            etMessage.setVisibility(VISIBLE);
+            hideAllPanels();
+            hideKeyboard();
+            etMessage.clearFocus();
+        } else {
+            ivSpeechToText.setVisibility(currentMode == InputMode.VOICE ? GONE : VISIBLE);
+            ivSpeechToText.setRecording(false);
+            ivSpeechToText.setContentDescription("语音转文字");
+            updateSendButtonState();
+        }
+    }
+
+    /** Updates the active microphone waves from the current microphone level. */
+    public void setSpeechToTextAudioLevel(float level) {
+        ivSpeechToText.setAudioLevel(level);
+    }
+
+    public boolean isSpeechToTextRecording() {
+        return isSpeechToTextRecording;
+    }
+
+    private void stopSpeechToTextIfNeeded() {
+        if (isSpeechToTextRecording && listener != null) {
+            listener.onSpeechToTextStop();
+            // 不等待识别线程回调，界面先立即回到普通输入状态。
+            setSpeechToTextRecording(false);
+        }
+    }
+
     public void hideAllPanels() {
         panelMore.setVisibility(GONE);
         panelEmoji.setVisibility(GONE);
@@ -428,6 +497,10 @@ public class ChatInputView extends LinearLayout {
     }
 
     public boolean onInterceptBackPressed() {
+        if (isSpeechToTextRecording) {
+            stopSpeechToTextIfNeeded();
+            return true;
+        }
         if (currentMode != InputMode.NONE && currentMode != InputMode.TEXT) {
             switchMode(InputMode.NONE);
             return true;

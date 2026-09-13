@@ -40,6 +40,8 @@ import android.widget.LinearLayout
 import com.kora.imcore.impl.IMMessage
 import com.kora.imui.quote.MessageQuote
 import com.kora.imcore.IMClient
+import com.kora.onsim.asr.OnnxSimAsr
+import com.kora.onsim.asr.OnnxSimAsrListener
 
 
 /**
@@ -68,6 +70,51 @@ class InputPanel(
     private val quotePreview = rootView.findViewById<LinearLayout>(R.id.layout_quote_preview)
     private val quotePreviewText = rootView.findViewById<TextView>(R.id.tv_quote_preview)
     private var pendingQuote: MessageQuote? = null
+    private var asrListening = false
+    private var asrViewActive = true
+    private var asrBaseText = ""
+
+    private val asrListener = object : OnnxSimAsrListener {
+        override fun onListeningStarted() {
+            if (asrViewActive) chatInputView.setSpeechToTextRecording(true)
+        }
+
+        override fun onAudioLevel(level: Float) {
+            if (asrViewActive && asrListening) {
+                chatInputView.setSpeechToTextAudioLevel(level)
+            }
+        }
+
+        override fun onPartialResult(text: String) {
+            if (!asrViewActive || !asrListening) return
+            chatInputView.setSpeechInputText(joinSpeechText(asrBaseText, text))
+        }
+
+        override fun onFinalResult(text: String) {
+            if (!asrViewActive || !asrListening) return
+            asrBaseText = joinSpeechText(asrBaseText, text)
+            chatInputView.setSpeechInputText(asrBaseText)
+        }
+
+        override fun onError(error: Throwable) {
+            if (!asrViewActive) return
+            asrListening = false
+            chatInputView.setSpeechToTextRecording(false)
+            chatInputView.setSpeechToTextAudioLevel(0f)
+            Toast.makeText(
+                fragment.requireContext(),
+                "语音转文字失败：${error.message ?: "未知错误"}",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+
+        override fun onStopped() {
+            if (!asrViewActive) return
+            asrListening = false
+            chatInputView.setSpeechToTextRecording(false)
+            chatInputView.setSpeechToTextAudioLevel(0f)
+        }
+    }
     private val filePicker = fragment.registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@registerForActivityResult
         val resolver = fragment.requireContext().contentResolver
@@ -165,6 +212,29 @@ class InputPanel(
         chatInputView.setInputText(text)
     }
 
+    /** Stop ASR when the chat view is destroyed without releasing the app-wide engine. */
+    fun releaseSpeechToText() {
+        asrViewActive = false
+        if (asrListening) OnnxSimAsr.stopListening()
+        asrListening = false
+    }
+
+    private fun joinSpeechText(base: String, recognized: String): String {
+        // VAD 可能因为短暂停顿把一句话拆成多个片段。中文输入时直接连续拼接，
+        // 不额外插入空格；如果前一个片段以句号结束且后面还有内容，则改成逗号。
+        // 其他标点以及片段内部的标点全部保留。
+        val text = recognized.trim()
+        if (text.isEmpty()) return base
+        val normalizedBase = base.trimEnd().let {
+            when {
+                it.endsWith("。") || it.endsWith("．") -> it.dropLast(1) + "，"
+                it.endsWith(".") -> it.dropLast(1) + ","
+                else -> it
+            }
+        }
+        return normalizedBase + text
+    }
+
     private fun clearQuote() {
         pendingQuote = null
         quotePreview.visibility = View.GONE
@@ -226,8 +296,34 @@ class InputPanel(
             }
 
             override fun onVoiceClick() {
-                // 处理点击语音按钮的逻辑
-                Toast.makeText(proxy?.getAppActivity(), "语音按钮点击", Toast.LENGTH_SHORT).show()
+                // 左侧按钮仍然只负责切换到“按住说话”的语音消息模式。
+            }
+
+            override fun onSpeechToTextClick() {
+                if (asrListening) {
+                    OnnxSimAsr.stopListening()
+                    return
+                }
+                if (!checkPermission()) return
+
+                val context = fragment.context ?: return
+                if (!OnnxSimAsr.isReady) {
+                    Toast.makeText(context, "语音引擎正在初始化，请稍候", Toast.LENGTH_SHORT).show()
+                    return
+                }
+
+                asrBaseText = chatInputView.getInputText()
+                val started = OnnxSimAsr.startListening(context, asrListener)
+                if (started) {
+                    asrListening = true
+                    chatInputView.setSpeechToTextRecording(true)
+                }
+            }
+
+            override fun onSpeechToTextStop() {
+                if (asrListening) OnnxSimAsr.stopListening()
+                asrListening = false
+                if (asrViewActive) chatInputView.setSpeechToTextRecording(false)
             }
 
             override fun onMoreOptionClick(optionName: String?) {

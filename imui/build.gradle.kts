@@ -28,4 +28,5 @@ dependencies {
     implementation(libs.glide)
     implementation(libs.pictureselector)
     api(project(":imcore"))
+    api(project(":onnx-sim-asr"))
 }

@@ -238,6 +238,7 @@ abstract class IMessageFragment : Fragment(), ModuleProxy {
     }
 
     override fun onDestroyView() {
+        inputPanel?.releaseSpeechToText()
         com.kora.imui.quote.QuoteActionDispatcher.onQuote = null
         com.kora.imui.quote.QuoteActionDispatcher.onLocate = null
         com.kora.imui.quote.QuoteActionDispatcher.onReedit = null

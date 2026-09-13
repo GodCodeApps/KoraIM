@@ -17,6 +17,8 @@ import com.kora.imui.ImUIKitImpl
 import com.kora.imui.listener.SessionEventListener
 import com.kora.imui.notification.IMNotificationManager
 import com.kora.imcall.IMCall
+import com.kora.onsim.asr.OnnxSimAsr
+import com.kora.onsim.asr.OnnxSimAsrInitializationListener
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -25,6 +27,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        initializeAsrEngine()
         configureMessageActions()
         observeKickEvents()
         currentAccount = savedInstanceState?.getString(STATE_ACCOUNT)
@@ -110,8 +113,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        OnnxSimAsr.release()
         IMClient.release()
         super.onDestroy()
+    }
+
+    private fun initializeAsrEngine() {
+        OnnxSimAsr.initialize(applicationContext, object : OnnxSimAsrInitializationListener {
+            override fun onInitialized() {
+                android.util.Log.i("KoraIM_ASR", "ASR engine initialized")
+            }
+
+            override fun onError(error: Throwable) {
+                android.util.Log.e("KoraIM_ASR", "ASR engine initialization failed", error)
+            }
+        })
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
