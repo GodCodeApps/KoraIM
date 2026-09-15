@@ -12,9 +12,9 @@ KoraIM 是一个模块化的 Android 即时通讯示例工程，包含通信内�
 
 <div align="center">
   <img src="screenshot/Screenshot_20260822_084229.png" width="48%" />
-  <img src="screenshot/Screenshot_20260822_084252.png" width="48%" />
+  <img src="screenshot/Screenshot_20260913_225950.png" width="48%" />
   <br />
-  <img src="screenshot/Screenshot_20260822_084336.png" width="48%" />
+  <img src="screenshot/Screenshot_20260913_230141.png" width="48%" />
   <img src="screenshot/Screenshot_20260822_084402.png" width="48%" />
 </div>
 
