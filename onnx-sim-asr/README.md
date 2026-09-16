@@ -7,6 +7,7 @@
 - Silero VAD 语音活动检测；
 - `AudioRecord` 麦克风采集；
 - 临时识别结果、最终识别结果和实时音量回调。
+- 已存在录音文件转文字：支持库内录制的 AAC/M4A 文件，不包含 UI。
 
 ## 生命周期
 
@@ -153,6 +154,50 @@ OnnxSimAsr.release();
 
 `initialize`、识别和模型加载都不会阻塞主线程，所有回调均在主线程执行。
 
+## 已存在录音转文字
+
+`transcribeAudio` 用于把已经录好的本地 AAC/M4A 文件转换为中文文本，适合消息列表中
+对历史语音消息执行“转文字”。调用前仍然需要先完成一次 `initialize`，识别结果和状态
+回调均在主线程执行；该接口不需要重新打开麦克风。
+
+```kotlin
+OnnxSimAsr.transcribeAudio(
+    context = this,
+    audioPath = voiceFile.absolutePath,
+    listener = object : OnnxSimAsrFileListener {
+        override fun onStarted() {}
+
+        override fun onResult(text: String) {
+            // 更新语音消息下方的文字
+        }
+
+        override fun onError(error: Throwable) {}
+
+        override fun onFinished() {}
+    },
+)
+```
+
+Java 可以直接调用同一个静态方法：
+
+```java
+OnnxSimAsr.transcribeAudio(this, voicePath, new OnnxSimAsrFileListener() {
+    @Override
+    public void onResult(String text) {
+        // 显示或保存识别结果
+    }
+
+    @Override
+    public void onError(Throwable error) {
+        // 处理失败
+    }
+});
+```
+
+`transcribeAudio` 内部使用 Android `MediaExtractor`/`MediaCodec` 将 AAC/M4A 解码为
+16 kHz 单声道 PCM，再交给 SenseVoice 识别。库只接收本地路径；如果语音来自网络，
+应先下载到应用缓存目录后再调用。
+
 ## API 说明
 
 ### `OnnxSimAsr`
@@ -164,6 +209,7 @@ OnnxSimAsr.release();
 | `initialize(context, modelType, callback)` | `Boolean` | 使用 sherpa-onnx 模型类型初始化 |
 | `isReady` | `Boolean` | 模型和 VAD 是否已经准备完成 |
 | `startListening(context, listener)` | `Boolean` | 开始麦克风监听；未初始化或无权限时失败 |
+| `transcribeAudio(context, audioPath, listener)` | `Boolean` | 将本地 AAC/M4A 录音转为中文文本 |
 | `stopListening()` | `Unit` | 停止采集并处理剩余音频 |
 | `release()` | `Unit` | 停止监听并释放识别器、VAD 和 native 资源 |
 
@@ -178,6 +224,15 @@ OnnxSimAsr.release();
 | `onFinalResult(text)` | VAD 判定一段语音结束后的最终结果 |
 | `onError(error)` | 录音、模型或识别异常 |
 | `onStopped()` | 监听停止且剩余音频处理完成 |
+
+### `OnnxSimAsrFileListener`
+
+| 回调 | 说明 |
+|---|---|
+| `onStarted()` | 文件识别任务开始 |
+| `onResult(text)` | 返回完整中文识别结果 |
+| `onError(error)` | 文件读取、解码或识别失败 |
+| `onFinished()` | 任务结束；成功和失败都会回调 |
 
 ## 接入聊天输入框
 
@@ -198,6 +253,11 @@ OnnxSimAsr.initialize(applicationContext)
 右侧按钮状态由 `SpeechToTextMicView` 管理：未选中时显示灰色细线麦克风，
 选中时显示绿色圆形麦克风；`onAudioLevel` 驱动声波和圆形扩散动画。发送按钮
 会调用停止转文字流程，避免后台识别结果在发送后再次写入输入框。
+
+语音消息长按菜单会额外显示“转文字”。`imui` 会优先使用消息附件中的本地录音，
+本地文件不存在时下载 `remoteUrl` 到应用缓存，再调用 `transcribeAudio`。识别结果显示
+在语音气泡下方的独立文字气泡中，并按消息 ID 保存在本地；不会修改或重新发送原始
+消息。已有结果再次长按时会显示“取消转文字”，点击后隐藏文字并清除本地结果。
 
 ## Java 接入注意事项
 

@@ -38,6 +38,14 @@ interface OnnxSimAsrInitializationListener {
     fun onError(error: Throwable) = Unit
 }
 
+/** Callback for converting an existing local AAC/M4A voice file to text. */
+interface OnnxSimAsrFileListener {
+    fun onStarted() = Unit
+    fun onResult(text: String) = Unit
+    fun onError(error: Throwable) = Unit
+    fun onFinished() = Unit
+}
+
 /**
  * sherpa-onnx simulated-streaming ASR facade.
  *
@@ -59,6 +67,7 @@ object OnnxSimAsr {
     private val stateLock = Any()
     private val isRecording = AtomicBoolean(false)
     private val isProcessing = AtomicBoolean(false)
+    private val isFileTranscribing = AtomicBoolean(false)
     private val isStarting = AtomicBoolean(false)
     private val isInitializing = AtomicBoolean(false)
     private val stopRequested = AtomicBoolean(false)
@@ -158,6 +167,7 @@ object OnnxSimAsr {
 
         synchronized(stateLock) {
             if (isInitializing.get() || isRecording.get() || isProcessing.get() ||
+                isFileTranscribing.get() ||
                 !isStarting.compareAndSet(false, true)
             ) {
                 return false
@@ -185,6 +195,53 @@ object OnnxSimAsr {
                 postError(listener, error)
             }
         }
+        return true
+    }
+
+    /** Convert a local AAC/M4A voice file to Chinese text. */
+    @JvmStatic
+    fun transcribeAudio(
+        context: Context,
+        audioPath: String,
+        listener: OnnxSimAsrFileListener,
+    ): Boolean {
+        if (audioPath.isBlank()) {
+            postFileError(listener, IllegalArgumentException("audioPath is empty"))
+            return false
+        }
+        if (!isReady) {
+            postFileError(listener, IllegalStateException("Call OnnxSimAsr.initialize() before transcribeAudio()"))
+            return false
+        }
+
+        synchronized(stateLock) {
+            if (isInitializing.get() || isRecording.get() || isProcessing.get() ||
+                isStarting.get() || !isFileTranscribing.compareAndSet(false, true)
+            ) {
+                postFileError(listener, IllegalStateException("ASR is busy"))
+                return false
+            }
+        }
+
+        val appContext = context.applicationContext
+        post { listener.onStarted() }
+        executor.execute {
+            try {
+                val samples = AudioFileDecoder.decode(audioPath)
+                val text = decodeSamples(samples)
+                if (text.isBlank()) error("No speech was recognized")
+                post { listener.onResult(text) }
+            } catch (error: Throwable) {
+                Log.e(TAG, "Failed to transcribe audio file", error)
+                post { listener.onError(error) }
+            } finally {
+                isFileTranscribing.set(false)
+                if (releaseRequested.get()) releaseModels()
+                post { listener.onFinished() }
+            }
+        }
+        // Keep the application context referenced for the duration of the task.
+        applicationContext = appContext
         return true
     }
 
@@ -217,7 +274,9 @@ object OnnxSimAsr {
             listener = null
             applicationContext = null
         }
-        if (!isProcessing.get() && !isStarting.get() && !isInitializing.get()) releaseModels()
+        if (!isProcessing.get() && !isStarting.get() && !isInitializing.get() &&
+            !isFileTranscribing.get()
+        ) releaseModels()
     }
 
     private fun ensureInitialized(context: Context, asrModelType: Int) {
@@ -308,20 +367,9 @@ object OnnxSimAsr {
         var speechStartOffset = 0
         var lastDecodeTime = System.currentTimeMillis()
 
-        fun decode(samples: FloatArray): String {
-            val stream = recognizer!!.createStream()
-            return try {
-                stream.acceptWaveform(samples, SAMPLE_RATE)
-                recognizer!!.decode(stream)
-                recognizer!!.getResult(stream).text
-            } finally {
-                stream.release()
-            }
-        }
-
         fun consumeVadSegments() {
             while (!vad!!.empty()) {
-                val text = decode(vad!!.front().samples)
+                val text = decodeSamples(vad!!.front().samples)
                 speechStarted = false
                 vad!!.pop()
                 buffer = ArrayList()
@@ -354,7 +402,7 @@ object OnnxSimAsr {
                     System.currentTimeMillis() - lastDecodeTime >= PARTIAL_DECODE_INTERVAL_MS &&
                     speechStartOffset < offset
                 ) {
-                    val text = decode(buffer.subList(speechStartOffset, offset).toFloatArray())
+                    val text = decodeSamples(buffer.subList(speechStartOffset, offset).toFloatArray())
                     if (text.isNotBlank()) {
                         post { this.listener?.onPartialResult(text) }
                     }
@@ -379,6 +427,18 @@ object OnnxSimAsr {
         }
     }
 
+    private fun decodeSamples(samples: FloatArray): String {
+        val currentRecognizer = recognizer ?: error("ASR recognizer is not initialized")
+        val stream = currentRecognizer.createStream()
+        return try {
+            stream.acceptWaveform(samples, SAMPLE_RATE)
+            currentRecognizer.decode(stream)
+            currentRecognizer.getResult(stream).text
+        } finally {
+            stream.release()
+        }
+    }
+
     private fun releaseModels() {
         synchronized(stateLock) {
             recognizer?.release()
@@ -396,6 +456,11 @@ object OnnxSimAsr {
 
     private fun postError(target: OnnxSimAsrListener?, error: Throwable) {
         if (target != null) post { target.onError(error) }
+    }
+
+    private fun postFileError(target: OnnxSimAsrFileListener, error: Throwable) {
+        post { target.onError(error) }
+        post { target.onFinished() }
     }
 
     private inline fun post(crossinline action: () -> Unit) {

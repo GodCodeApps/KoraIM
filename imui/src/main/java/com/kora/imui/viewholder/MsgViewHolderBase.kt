@@ -23,6 +23,8 @@ import com.kora.imcore.impl.IMMessage
 import com.kora.imui.ImUIKitImpl
 import com.kora.imui.IMMediaMessageSender
 import com.kora.imui.R
+import com.kora.imui.VoiceTranscriptionManager
+import com.kora.imui.VoiceTranscriptionStore
 import com.kora.imui.utils.TimeFormatUtils
 import com.kora.imcore.constant.MsgStatus
 import kotlinx.coroutines.launch
@@ -121,11 +123,12 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
             mMessage?.getMsgType() == MsgType.RED_PACKET ||
             mMessage?.getMsgType() == com.kora.imui.attachment.CardAttachment.TYPE_CARD ||
             mMessage?.getMsgType() == com.kora.imui.attachment.LocationAttachment.TYPE_LOCATION
+        val isVoice = mMessage?.getMsgType() == MsgType.VOICE
         if (isReceivedMsg()) {
             leftAvatar?.visibility = View.VISIBLE
             rightAvatar?.visibility = View.GONE
             flMsgStatus?.visibility = View.GONE
-            if (isMedia) {
+            if (isMedia || isVoice) {
                 contentContainer?.setBackgroundResource(0)
             } else {
                 contentContainer?.setBackgroundResource(R.drawable.im_msg_left_bg)
@@ -136,7 +139,7 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
             leftAvatar?.visibility = View.GONE
             rightAvatar?.visibility = View.VISIBLE
             flMsgStatus?.visibility = View.VISIBLE
-            if (isMedia) {
+            if (isMedia || isVoice) {
                 contentContainer?.setBackgroundResource(0)
                 contentContainer?.backgroundTintList = null
             } else {
@@ -163,6 +166,9 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                     }
                 }
             }
+        }
+        if (isVoice) {
+            contentContainer?.setPadding(0, 0, 0, 0)
         }
 
         // 统一处理头像加载与默认头像兜底
@@ -304,6 +310,19 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                 android.widget.Toast.makeText(context, "已复制", android.widget.Toast.LENGTH_SHORT).show()
             }
         }
+        if (msg.getMsgType() == MsgType.VOICE) {
+            val hasTranscript = VoiceTranscriptionStore
+                .get(context, msg.getMsgId())
+                .isNotBlank()
+            options.add(if (hasTranscript) "取消转文字" else "转文字")
+            actions.add {
+                if (hasTranscript) {
+                    onVoiceTranscriptionCancelled(context, msg)
+                } else {
+                    onVoiceTranscriptionRequested(context, msg, false)
+                }
+            }
+        }
 
         if (!isCallRecord) {
             options.add("转发")
@@ -353,6 +372,39 @@ open class MsgViewHolderBase(itemView: View) : RecyclerView.ViewHolder(itemView)
                 actions.getOrNull(which)?.invoke()
             }
             .show()
+    }
+
+    protected open fun onVoiceTranscriptionRequested(
+        context: android.content.Context,
+        message: IMMessage,
+        force: Boolean,
+    ) {
+        VoiceTranscriptionManager.transcribe(
+            context = context,
+            message = message,
+            force = force,
+            onStarted = {
+                android.widget.Toast.makeText(context, "正在转文字…", android.widget.Toast.LENGTH_SHORT).show()
+            },
+            onResult = {
+                android.widget.Toast.makeText(context, "转文字完成", android.widget.Toast.LENGTH_SHORT).show()
+            },
+            onError = { error ->
+                android.widget.Toast.makeText(
+                    context,
+                    "转文字失败：${error.message ?: "未知错误"}",
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+            },
+            onFinished = {},
+        )
+    }
+
+    protected open fun onVoiceTranscriptionCancelled(
+        context: android.content.Context,
+        message: IMMessage,
+    ) {
+        VoiceTranscriptionStore.remove(context, message.getMsgId())
     }
 
     protected fun launchWhenAttached(view: View, block: suspend kotlinx.coroutines.CoroutineScope.() -> Unit) {
