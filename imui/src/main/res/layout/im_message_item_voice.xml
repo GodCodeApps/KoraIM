@@ -1,28 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/ll_voice_container"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-  >
+    android:gravity="start"
+    android:orientation="vertical">
 
-    <!-- 用来放声波图标 -->
-    <ImageView
-        android:id="@+id/iv_voice_wave"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
-        android:src="@drawable/ic_chat_voice_3" />
-
-    <!-- 用来放时长文字 (如 5") -->
-    <TextView
-        android:id="@+id/tv_duration"
+    <FrameLayout
+        android:id="@+id/voice_bubble"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="4dp"
-        android:layout_marginEnd="4dp"
-        android:padding="2dp"
-        android:textColor="#333333"
-        android:textSize="16sp" />
+        android:padding="10dp">
 
+        <LinearLayout
+            android:id="@+id/ll_voice_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+        <!-- 用来放声波图标 -->
+        <ImageView
+            android:id="@+id/iv_voice_wave"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/ic_chat_voice_3" />
+
+        <!-- 用来放时长文字 (如 5") -->
+            <TextView
+            android:id="@+id/tv_duration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:padding="2dp"
+            android:textColor="#333333"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/tv_voice_transcription"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:maxWidth="240dp"
+        android:padding="10dp"
+        android:textColor="#333333"
+        android:textIsSelectable="true"
+        android:textSize="14sp"
+        android:visibility="gone" />
 </LinearLayout>
