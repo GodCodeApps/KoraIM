@@ -302,3 +302,7 @@ OnnxSimAsr.initialize(this, new OnnxSimAsrInitializationListener() {
 当前模型随 AAR/APK 一起打包，SenseVoice 模型约 228 MB。若对 APK 体积敏感，
 后续可以把模型改为下载到 `filesDir` 后再初始化，但需要额外实现版本校验、下载
 失败重试和本地文件安全校验。
+
+###  注意: 这个要下载进去导入
+sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
+
