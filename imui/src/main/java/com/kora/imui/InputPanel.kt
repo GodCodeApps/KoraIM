@@ -73,6 +73,7 @@ class InputPanel(
     private var asrListening = false
     private var asrViewActive = true
     private var asrBaseText = ""
+    private var saveAsrAudioToLocal = true
 
     private val asrListener = object : OnnxSimAsrListener {
         override fun onListeningStarted() {
@@ -215,7 +216,7 @@ class InputPanel(
     /** Stop ASR when the chat view is destroyed without releasing the app-wide engine. */
     fun releaseSpeechToText() {
         asrViewActive = false
-        if (asrListening) OnnxSimAsr.stopListening()
+        if (asrListening) OnnxSimAsr.stopListening(promptToSave = false)
         asrListening = false
     }
 
@@ -313,7 +314,11 @@ class InputPanel(
                 }
 
                 asrBaseText = chatInputView.getInputText()
-                val started = OnnxSimAsr.startListening(context, asrListener)
+                val started = OnnxSimAsr.startListening(
+                    context,
+                    asrListener,
+                    saveToLocal = saveAsrAudioToLocal,
+                )
                 if (started) {
                     asrListening = true
                     chatInputView.setSpeechToTextRecording(true)

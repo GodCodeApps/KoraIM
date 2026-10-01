@@ -62,6 +62,7 @@ OnnxSimAsr.initialize(this, object : OnnxSimAsrInitializationListener {
 })
 
 // 按住录音按钮时调用，调用前必须已经初始化成功。
+// 需要在停止时询问是否保存录音时，将第三个参数设为 true。
 OnnxSimAsr.startListening(this, object : OnnxSimAsrListener {
     override fun onListeningStarted() {
         // 开始采集麦克风。
@@ -86,10 +87,12 @@ OnnxSimAsr.startListening(this, object : OnnxSimAsrListener {
     override fun onStopped() {
         // 已停止并处理完剩余音频。
     }
-})
+}, saveToLocal = true)
 
 // 松开录音按钮或取消录音。
 OnnxSimAsr.stopListening()
+// saveToLocal=true 时会弹出确认框；确认后保存到应用 Music/KoraIM 目录，
+// 并通过 Log 输出保存文件的绝对路径。
 
 // 页面销毁，或应用不再使用 ASR 时调用。
 OnnxSimAsr.release()
@@ -208,9 +211,11 @@ OnnxSimAsr.transcribeAudio(this, voicePath, new OnnxSimAsrFileListener() {
 | `initialize(context, callback)` | `Boolean` | 初始化并接收成功/失败回调 |
 | `initialize(context, modelType, callback)` | `Boolean` | 使用 sherpa-onnx 模型类型初始化 |
 | `isReady` | `Boolean` | 模型和 VAD 是否已经准备完成 |
-| `startListening(context, listener)` | `Boolean` | 开始麦克风监听；未初始化或无权限时失败 |
+| `startListening(context, listener)` | `Boolean` | 开始麦克风监听，不保存录音文件 |
+| `startListening(context, listener, saveToLocal)` | `Boolean` | 开始监听；传入 `true` 后停止时确认是否保存 WAV 录音 |
 | `transcribeAudio(context, audioPath, listener)` | `Boolean` | 将本地 AAC/M4A 录音转为中文文本 |
 | `stopListening()` | `Unit` | 停止采集并处理剩余音频 |
+| `stopListening(promptToSave)` | `Unit` | 生命周期清理时可传入 `false`，避免弹出保存确认框 |
 | `release()` | `Unit` | 停止监听并释放识别器、VAD 和 native 资源 |
 
 ### `OnnxSimAsrListener`

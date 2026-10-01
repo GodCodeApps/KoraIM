@@ -1,7 +1,10 @@
 package com.kora.onsim.asr
 
 import android.Manifest
+import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -11,6 +14,11 @@ import android.os.Looper
 import android.util.Log
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.Vad
+import java.io.File
+import java.lang.ref.WeakReference
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
@@ -71,6 +79,7 @@ object OnnxSimAsr {
     private val isStarting = AtomicBoolean(false)
     private val isInitializing = AtomicBoolean(false)
     private val stopRequested = AtomicBoolean(false)
+    private val stopRequestedByCaller = AtomicBoolean(false)
     private val releaseRequested = AtomicBoolean(false)
     private val sampleQueue = LinkedBlockingQueue<FloatArray>()
 
@@ -88,6 +97,18 @@ object OnnxSimAsr {
 
     @Volatile
     private var applicationContext: Context? = null
+
+    @Volatile
+    private var saveToLocal = false
+
+    @Volatile
+    private var wavRecorder: PcmWavRecorder? = null
+
+    @Volatile
+    private var temporaryAudioFile: File? = null
+
+    @Volatile
+    private var saveDialogActivity: WeakReference<Activity>? = null
 
     /** True once the ASR and VAD models have been loaded successfully. */
     val isReady: Boolean
@@ -155,6 +176,20 @@ object OnnxSimAsr {
     fun startListening(
         context: Context,
         listener: OnnxSimAsrListener,
+    ): Boolean = startListening(context, listener, saveToLocal = false)
+
+    /**
+     * Start microphone recognition and optionally keep the captured audio.
+     *
+     * When [saveToLocal] is true, [stopListening] shows a confirmation dialog
+     * after the recording has been finalized. The confirmed file is saved as a
+     * WAV file under the app's external Music directory.
+     */
+    @JvmStatic
+    fun startListening(
+        context: Context,
+        listener: OnnxSimAsrListener,
+        saveToLocal: Boolean,
     ): Boolean {
         if (!hasRecordAudioPermission(context)) {
             postError(listener, SecurityException("RECORD_AUDIO permission has not been granted"))
@@ -173,9 +208,12 @@ object OnnxSimAsr {
                 return false
             }
             stopRequested.set(false)
+            stopRequestedByCaller.set(false)
             releaseRequested.set(false)
             applicationContext = context.applicationContext
             this.listener = listener
+            this.saveToLocal = saveToLocal
+            saveDialogActivity = WeakReference(findActivity(context))
         }
 
         val context = context.applicationContext
@@ -248,11 +286,20 @@ object OnnxSimAsr {
     /** Stop the current recording and decode the remaining audio. */
     @JvmStatic
     fun stopListening() {
+        stopListening(promptToSave = true)
+    }
+
+    /** Stops listening without showing the save dialog, for lifecycle cleanup. */
+    @JvmStatic
+    fun stopListening(promptToSave: Boolean) {
         if (isStarting.get() && !isRecording.get()) {
+            stopRequestedByCaller.set(promptToSave)
             stopRequested.set(true)
             return
         }
         if (!isRecording.compareAndSet(true, false)) return
+
+        stopRequestedByCaller.set(promptToSave)
 
         try {
             audioRecord?.let { record ->
@@ -268,11 +315,12 @@ object OnnxSimAsr {
     /** Stop recording and release model/native resources after pending decoding finishes. */
     @JvmStatic
     fun release() {
-        stopListening()
+        stopListening(promptToSave = false)
         releaseRequested.set(true)
         synchronized(stateLock) {
             listener = null
             applicationContext = null
+            saveDialogActivity = null
         }
         if (!isProcessing.get() && !isStarting.get() && !isInitializing.get() &&
             !isFileTranscribing.get()
@@ -321,6 +369,17 @@ object OnnxSimAsr {
 
         sampleQueue.clear()
         vad!!.reset()
+        if (saveToLocal) {
+            val tempFile = File(
+                applicationContext?.cacheDir ?: error("Application context is unavailable"),
+                "onnx_sim_asr_${System.currentTimeMillis()}.wav",
+            )
+            wavRecorder = PcmWavRecorder(tempFile, SAMPLE_RATE, 1)
+            temporaryAudioFile = tempFile
+        } else {
+            wavRecorder = null
+            temporaryAudioFile = null
+        }
         audioRecord = record
         isStarting.set(false)
         isRecording.set(true)
@@ -338,6 +397,7 @@ object OnnxSimAsr {
             while (isRecording.get()) {
                 val count = record.read(buffer, 0, buffer.size)
                 if (count > 0) {
+                    wavRecorder?.append(buffer, count)
                     var peak = 0f
                     val samples = FloatArray(count) { index ->
                         val sample = buffer[index] / 32768.0f
@@ -354,6 +414,7 @@ object OnnxSimAsr {
                 postError(listener, error)
             }
         } finally {
+            finishWavRecording()
             sampleQueue.offer(FloatArray(0))
             runCatching { record.release() }
             if (audioRecord === record) audioRecord = null
@@ -420,11 +481,111 @@ object OnnxSimAsr {
             Log.e(TAG, "Recognition failed", error)
             postError(listener, error)
         } finally {
+            val shouldPromptForSave = stopRequestedByCaller.get() &&
+                saveToLocal && !releaseRequested.get()
             isProcessing.set(false)
             isStarting.set(false)
             if (releaseRequested.get()) releaseModels()
-            post { this.listener?.onStopped() }
+            post {
+                this.listener?.onStopped()
+                if (shouldPromptForSave) {
+                    showSaveAudioDialog()
+                } else {
+                    discardTemporaryAudioFile()
+                }
+            }
         }
+    }
+
+    private fun finishWavRecording() {
+        val recorder = wavRecorder
+        wavRecorder = null
+        runCatching { recorder?.close() }
+            .onFailure { error -> Log.e(TAG, "Failed to finalize WAV recording", error) }
+
+        val file = temporaryAudioFile
+        if (file == null || !file.exists() || file.length() <= WAV_HEADER_SIZE) {
+            file?.delete()
+            temporaryAudioFile = null
+        }
+    }
+
+    private fun showSaveAudioDialog() {
+        val file = temporaryAudioFile
+        val activity = saveDialogActivity?.get()
+        if (file == null || !file.exists()) return
+        if (activity == null || activity.isFinishing ||
+            (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR1 &&
+                activity.isDestroyed)
+        ) {
+            Log.w(TAG, "Cannot show save dialog because the recording Activity is unavailable")
+            discardTemporaryAudioFile()
+            return
+        }
+
+        AlertDialog.Builder(activity)
+            .setTitle("保存录音")
+            .setMessage("是否将本次语音识别录音保存到本地？")
+            .setNegativeButton("取消") { _, _ -> discardTemporaryAudioFile() }
+            .setPositiveButton("保存") { _, _ -> saveAudioFile(file) }
+            .setOnCancelListener { discardTemporaryAudioFile() }
+            .show()
+    }
+
+    private fun saveAudioFile(source: File) {
+        val context = applicationContext
+        if (context == null) {
+            Log.e(TAG, "Cannot save recording: application context is unavailable")
+            discardTemporaryAudioFile()
+            return
+        }
+
+        executor.execute {
+            try {
+                val directory = File(
+                    context.getExternalFilesDir(android.os.Environment.DIRECTORY_MUSIC)
+                        ?: File(context.filesDir, "Music"),
+                    "KoraIM",
+                )
+                check(directory.mkdirs() || directory.isDirectory) {
+                    "Cannot create audio directory: ${directory.absolutePath}"
+                }
+                val name = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US)
+                    .format(Date())
+                val target = File(directory, "asr_$name.wav")
+                source.copyTo(target, overwrite = false)
+                source.delete()
+                temporaryAudioFile = null
+                Log.i(TAG, "Audio saved to: ${target.absolutePath}")
+                post {
+                    android.widget.Toast.makeText(
+                        context,
+                        "录音保存成功：${target.absolutePath}",
+                        android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                }
+            } catch (error: Throwable) {
+                Log.e(TAG, "Failed to save audio recording", error)
+            }
+        }
+    }
+
+    private fun discardTemporaryAudioFile() {
+        temporaryAudioFile?.let { file ->
+            if (file.exists() && !file.delete()) {
+                Log.w(TAG, "Failed to delete temporary audio file: ${file.absolutePath}")
+            }
+        }
+        temporaryAudioFile = null
+    }
+
+    private fun findActivity(context: Context): Activity? {
+        var current: Context? = context
+        while (current is ContextWrapper) {
+            if (current is Activity) return current
+            current = current.baseContext
+        }
+        return current as? Activity
     }
 
     private fun decodeSamples(samples: FloatArray): String {
@@ -448,8 +609,11 @@ object OnnxSimAsr {
             sampleQueue.clear()
             stopRequested.set(false)
             releaseRequested.set(false)
+            stopRequestedByCaller.set(false)
         }
     }
+
+    private const val WAV_HEADER_SIZE = 44L
 
     private fun hasRecordAudioPermission(context: Context): Boolean =
         context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
