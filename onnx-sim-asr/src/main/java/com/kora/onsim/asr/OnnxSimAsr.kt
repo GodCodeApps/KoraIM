@@ -24,19 +24,32 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Callback for microphone recognition.
+ * 麦克风实时语音识别回调。
  *
- * [onPartialResult] is called repeatedly while the current utterance is being
- * spoken. [onFinalResult] is called when VAD detects the end of an utterance.
- * All callbacks are delivered on the main thread.
+ * [onPartialResult] 会在当前语句识别过程中多次回调临时结果；
+ * [onFinalResult] 会在 VAD 检测到当前语句结束后回调最终结果。
+ * 所有回调均在主线程执行。
  */
 interface OnnxSimAsrListener {
+    /** ASR 引擎已经准备好，可以开始录音。 */
     fun onReady() = Unit
+
+    /** 已经开始采集麦克风音频。 */
     fun onListeningStarted() = Unit
+
+    /** 实时音量，范围为 0..1。 */
     fun onAudioLevel(level: Float) = Unit
+
+    /** 当前语句的临时识别结果，可能会重复返回部分或完整文本。 */
     fun onPartialResult(text: String) = Unit
+
+    /** 当前语句识别完成后的最终结果。 */
     fun onFinalResult(text: String) = Unit
+
+    /** 录音、识别或模型处理发生异常。 */
     fun onError(error: Throwable) = Unit
+
+    /** 已停止录音，并完成剩余音频的识别处理。 */
     fun onStopped() = Unit
 }
 
@@ -106,6 +119,9 @@ object OnnxSimAsr {
 
     @Volatile
     private var temporaryAudioFile: File? = null
+
+    @Volatile
+    private var finalRecognizedText = ""
 
     @Volatile
     private var saveDialogActivity: WeakReference<Activity>? = null
@@ -210,6 +226,7 @@ object OnnxSimAsr {
             stopRequested.set(false)
             stopRequestedByCaller.set(false)
             releaseRequested.set(false)
+            finalRecognizedText = ""
             applicationContext = context.applicationContext
             this.listener = listener
             this.saveToLocal = saveToLocal
@@ -427,6 +444,8 @@ object OnnxSimAsr {
         var speechStarted = false
         var speechStartOffset = 0
         var lastDecodeTime = System.currentTimeMillis()
+        val finalTexts = ArrayList<String>()
+        var pendingPartialText = ""
 
         fun consumeVadSegments() {
             while (!vad!!.empty()) {
@@ -436,7 +455,13 @@ object OnnxSimAsr {
                 buffer = ArrayList()
                 offset = 0
                 if (text.isNotBlank()) {
+                    finalTexts += text
+                    pendingPartialText = ""
                     post { this.listener?.onFinalResult(text) }
+                } else if (pendingPartialText.isNotBlank()) {
+                    // VAD 结束时如果最终解码为空，保留最近一次实时识别结果。
+                    finalTexts += pendingPartialText
+                    pendingPartialText = ""
                 }
             }
         }
@@ -465,6 +490,7 @@ object OnnxSimAsr {
                 ) {
                     val text = decodeSamples(buffer.subList(speechStartOffset, offset).toFloatArray())
                     if (text.isNotBlank()) {
+                        pendingPartialText = text
                         post { this.listener?.onPartialResult(text) }
                     }
                     lastDecodeTime = System.currentTimeMillis()
@@ -481,6 +507,8 @@ object OnnxSimAsr {
             Log.e(TAG, "Recognition failed", error)
             postError(listener, error)
         } finally {
+            finalRecognizedText = (finalTexts + pendingPartialText)
+                .joinToString(separator = "")
             val shouldPromptForSave = stopRequestedByCaller.get() &&
                 saveToLocal && !releaseRequested.get()
             isProcessing.set(false)
@@ -553,14 +581,17 @@ object OnnxSimAsr {
                 val name = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US)
                     .format(Date())
                 val target = File(directory, "asr_$name.wav")
+                val textTarget = File(directory, "${target.nameWithoutExtension}.txt")
                 source.copyTo(target, overwrite = false)
+                textTarget.writeText(finalRecognizedText, Charsets.UTF_8)
                 source.delete()
                 temporaryAudioFile = null
                 Log.i(TAG, "Audio saved to: ${target.absolutePath}")
+                Log.i(TAG, "Recognized text saved to: ${textTarget.absolutePath}")
                 post {
                     android.widget.Toast.makeText(
                         context,
-                        "录音保存成功：${target.absolutePath}",
+                        "录音和识别文字保存成功：${target.absolutePath}",
                         android.widget.Toast.LENGTH_LONG,
                     ).show()
                 }
